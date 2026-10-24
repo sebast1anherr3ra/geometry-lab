@@ -25,34 +25,32 @@
 import * as THREE from 'three';import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 const fullscreenButton=document.querySelector('#fullscreen');
 const fullscreenText=document.querySelector('#fullscreenText');
+const isEmbedded=window.self!==window.top;
 function updateFullscreenButton(){
   const active=!!document.fullscreenElement;
-  fullscreenText.textContent=active?'Sair da tela inteira':'Tela inteira';
-  fullscreenButton.setAttribute('aria-label',active?'Sair da tela inteira':'Ativar tela inteira');
-  fullscreenButton.title=active?'Sair da tela inteira':'Ativar tela inteira';
-  // Recalcula o tamanho do renderizador após a mudança de modo.
+  fullscreenText.textContent=isEmbedded?'Abrir em nova aba':(active?'Sair da tela inteira':'Tela inteira');
+  fullscreenButton.setAttribute('aria-label',isEmbedded?'Abrir visualização em nova aba':(active?'Sair da tela inteira':'Ativar tela inteira'));
+  fullscreenButton.title=isEmbedded?'Abrir visualização em nova aba':(active?'Sair da tela inteira':'Ativar tela inteira');
   resizeRenderer();
 }
-async function toggleFullscreen(){
-  if(document.fullscreenElement){
-    try { await document.exitFullscreen(); } catch(err) { /* O navegador pode bloquear a saída via script. */ }
+function toggleFullscreen(){
+  // No Google Sites, a permissão de tela inteira do iframe pode ser bloqueada.
+  // Abrimos a página diretamente, de forma síncrona durante o clique, para
+  // evitar que o bloqueador de pop-ups rejeite a nova aba.
+  if(isEmbedded){
+    const opened=window.open(window.location.href,'_blank');
+    if(!opened) alert('O navegador bloqueou a nova aba. Permita pop-ups para este site ou abra o Geometric Lab diretamente pelo endereço do GitHub Pages.');
     return;
   }
-  try{
-    const target=document.documentElement;
-    if(target.requestFullscreen){
-      await target.requestFullscreen();
-      return;
-    }
-    throw new Error('Fullscreen API indisponível');
-  }catch(err){
-    // Em uma incorporação do Google Sites, a permissão de tela inteira pode
-    // ser bloqueada pelo iframe. Como alternativa, abre a própria visualização
-    // numa aba separada, onde os controles ocupam a janela inteira.
-    const opened=window.open(window.location.href,'_blank','noopener');
-    if(!opened){
-      alert('A incorporação bloqueou a tela inteira e o navegador também bloqueou a nova aba. Abra a visualização pelo endereço público do Geometric Lab.');
-    }
+  if(document.fullscreenElement){
+    if(document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+    return;
+  }
+  const target=document.documentElement;
+  if(target.requestFullscreen){
+    target.requestFullscreen().catch(()=>alert('Este navegador não permitiu a tela inteira. Tente abrir a visualização diretamente no navegador.'));
+  } else {
+    alert('Este navegador não oferece suporte à tela inteira.');
   }
 }
 fullscreenButton.addEventListener('click',toggleFullscreen);
@@ -76,4 +74,5 @@ baseSphere=new THREE.Mesh(new THREE.SphereGeometry(.58,36,24),new THREE.MeshStan
  hopfPoint.position.set(4.8,1.4-.60,0);hopfPoint.add(halo,marker);scene.add(hopfPoint);
 }
 const shape=document.querySelector('#shape'), curve=document.querySelector('#curve');function syncLabel(){const type=curve.value;const label=document.querySelector('#paramlabel');label.textContent=type==='latitude'?'Latitude':type==='great'?'Ângulo do plano':type==='wavy'?'Número de ondulações':type==='rhumb'?'':'Forma';label.style.display=type==='rhumb'?'none':'';shape.style.display=type==='rhumb'?'none':'';document.querySelector('#shapeval').style.display=type==='rhumb'?'none':'';if(type==='great'){shape.min='0';shape.max='6.28';shape.step='.01';shape.value='.8';}else if(type==='latitude'){shape.min='-.85';shape.max='.85';shape.step='.01';shape.value='.25';}else if(type==='wavy'){shape.min='1';shape.max='12';shape.step='1';shape.value='3';}else if(type==='rhumb'){shape.min='0.05';shape.max='2';shape.step='0.05';shape.value='0.5';}else{shape.min='0';shape.max='1';shape.step='.01';shape.value='.5';}document.querySelector('#shapeval').value=(type==='wavy')?String(Math.round(+shape.value)):(+shape.value).toFixed(2);build();}curve.addEventListener('change',syncLabel);shape.addEventListener('input',()=>{document.querySelector('#shapeval').value=(curve.value==='wavy'||curve.value==='rhumb')?String(Math.round(+shape.value)):(+shape.value).toFixed(2);build();});document.querySelector('#zoom').addEventListener('input',e=>{let d=+e.target.value,dir=camera.position.clone().sub(controls.target).normalize();camera.position.copy(controls.target).addScaledVector(dir,d);controls.update();document.querySelector('#zoomval').value=d.toFixed(1);});document.querySelector('#reset').addEventListener('click',()=>{camera.position.set(4.3,3,5.8);controls.target.set(0,0,0);controls.update();let d=camera.position.distanceTo(controls.target);document.querySelector('#zoom').value=d;document.querySelector('#zoomval').value=d.toFixed(1);});let spin=false;document.querySelector('#spin').addEventListener('click',e=>{spin=!spin;e.target.textContent=spin?'Parar giro':'Giro automático';});build();function animate(){requestAnimationFrame(animate);if(spin)group.rotation.y+=.003;controls.update();renderer.render(scene,camera);}animate();function resizeRenderer(){if(!renderer)return;const w=window.innerWidth,h=window.innerHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);}addEventListener('resize',resizeRenderer);
+updateFullscreenButton();
 </script></body></html>
