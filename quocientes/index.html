@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Identificação do quadrado — Toro e Garrafa de Klein</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d30;--line:#293a55;--text:#e8f0ff;--muted:#a9bad4;--blue:#91d5ff;--green:#55df83;--red:#ff6b70}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#14243a,var(--bg) 65%);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;padding:20px}
+main{max-width:1250px;margin:auto}.head{display:flex;gap:16px;justify-content:space-between;align-items:start;flex-wrap:wrap;margin-bottom:16px}h1{font-size:clamp(1.35rem,3vw,2rem);margin:0 0 6px}.sub{color:var(--muted);max-width:760px}.controls{display:grid;grid-template-columns:repeat(5,minmax(145px,1fr));gap:12px;background:var(--panel);border:1px solid var(--line);padding:14px;border-radius:16px;margin-bottom:16px}.control label{display:flex;justify-content:space-between;gap:8px;font-size:.9rem;margin-bottom:7px}.control output{color:var(--blue);font-variant-numeric:tabular-nums}.control input[type=range],select{width:100%}select{background:#0b1424;color:var(--text);border:1px solid #3b506f;border-radius:8px;padding:9px}input{accent-color:#78caff}.panels{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(0,1.4fr);gap:16px}.panel{background:linear-gradient(160deg,#121d30,#0d1728);border:1px solid var(--line);border-radius:16px;padding:14px;min-width:0}.panel h2{font-size:1rem;margin:0 0 10px}.square-wrap{display:grid;place-items:center;min-height:340px}.square-wrap svg{width:min(100%,390px);height:auto;overflow:visible}.view3d{height:480px;position:relative;overflow:hidden;border-radius:10px;background:#08111e}.view3d canvas{display:block;width:100%;height:100%}.hint{font-size:.82rem;color:var(--muted);margin:10px 2px 0}.legend{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:.82rem;margin-top:10px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}.status{font-size:.86rem;color:var(--muted);margin-top:12px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}button{border:1px solid #3b506f;background:#182943;color:var(--text);border-radius:9px;padding:8px 12px;cursor:pointer}button:hover{background:#233b5c}.site-fullscreen{flex-shrink:0;white-space:nowrap}.head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.head>div:first-child{flex:1}@media(max-width:850px){.controls{grid-template-columns:repeat(2,minmax(0,1fr))}.panels{grid-template-columns:1fr}.view3d{height:420px}}@media(max-width:460px){body{padding:10px}.controls{grid-template-columns:1fr}.view3d{height:350px}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body><main>
+<div class="head"><div><h1>Identificação dos lados do quadrado</h1><div class="sub">Explore a deformação do quadrado até o toro ou a garrafa de Klein. O ponto azul acompanha a parametrização e as setas indicam quais bordas devem ser identificadas.</div></div><button class="site-fullscreen" id="fullscreen">Tela cheia</button></div>
+<section class="controls">
+ <div class="control"><label for="tipo">Superfície</label><select id="tipo"><option value="Toro">Toro</option><option value="Klein">Garrafa de Klein</option></select></div>
+ <div class="control"><label for="s">1. Fechar lados verdes <output id="sval">0.00</output></label><input id="s" type="range" min="0" max="1" step="0.02" value="0"></div>
+ <div class="control"><label for="t">2. Identificar extremos vermelhos <output id="tval">0.00</output></label><input id="t" type="range" min="0" max="1" step="0.02" value="0"></div>
+ <div class="control"><label for="u0">Posição horizontal <output id="uval">0.35</output></label><input id="u0" type="range" min="0" max="1" step="0.01" value="0.35"></div>
+ <div class="control"><label for="v0">Posição vertical <output id="vval">0.60</output></label><input id="v0" type="range" min="0" max="1" step="0.01" value="0.60"></div>
+</section>
+<div class="panels">
+<section class="panel"><h2>Quadrado de identificação</h2><div class="square-wrap"><svg id="square" viewBox="-18 -22 436 436" role="img" aria-label="Quadrado com bordas e setas de identificação"></svg></div><div class="legend"><span><i class="dot" style="background:var(--green)"></i>Bordas verdes</span><span><i class="dot" style="background:var(--red)"></i>Bordas vermelhas</span><span><i class="dot" style="background:#316dff"></i>Ponto móvel</span></div><p class="hint">As bordas verdes são coladas com a mesma orientação. As vermelhas são coladas na mesma orientação para o toro e com orientação invertida para a garrafa de Klein.</p></section>
+<section class="panel"><h2>Superfície em 3D</h2><div class="view3d" id="view3d"><div class="actions"><button id="resetView">Reiniciar câmera</button><button id="resetAll">Reiniciar controles</button></div><p class="hint">Arraste para girar, use a roda do mouse para aproximar e afastar. A malha é uma amostragem numérica da parametrização.</p></section>
+</div><div class="status" id="status">Carregando visualização 3D…</div>
+</main>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const $=id=>document.getElementById(id);
+const view=$('view3d');
+let scene,camera,renderer,controls,surfaceGroup;
+const green=0x35d979, red=0xff5f68, blue=0x316dff;
+const r=.25,rK=1.25,R=1.4;
+function F_cyl(u,v){return new THREE.Vector3(2*u-1,r*Math.cos(2*Math.PI*v),r*Math.sin(2*Math.PI*v));}
+function F_torus(u,v){const U=2*Math.PI*u,V=2*Math.PI*v;return new THREE.Vector3((R+r*Math.cos(V))*Math.cos(U),(R+r*Math.cos(V))*Math.sin(U),r*Math.sin(V));}
+function F_klein(u,v){
+ const U=Math.PI*u,V=2*Math.PI*v,c=Math.cos(U),sn=Math.sin(U),cv=rK*Math.cos(V),sv=rK*Math.sin(V);
+ const x=-(4/15)*c*(3*cv-30*sn+90*Math.pow(c,4)*sn-60*Math.pow(c,6)*sn+5*c*cv*sn);
+ const y=-(2/15)*sn*(3*cv-3*c*c*cv-48*Math.pow(c,4)*cv+48*Math.pow(c,6)*cv-60*sn+5*c*cv*sn-5*Math.pow(c,3)*cv*sn-80*Math.pow(c,5)*cv*sn+80*Math.pow(c,7)*cv*sn);
+ const z=(4/15)*(3+5*c*sn)*sv;
+ return new THREE.Vector3(x,y,z);
+}
+function F(u,v){const type=$('tipo').value,s=+$('s').value,t=+$('t').value;const p0=new THREE.Vector3(2*u-1,v-.5,0),p1=F_cyl(u,v),p2=type==='Toro'?F_torus(u,v):F_klein(u,v);return p0.lerp(p1,s).lerp(p2,t);}
+function makeLine(points,color,closed=false){const geo=new THREE.BufferGeometry().setFromPoints(points);const obj=new THREE.Line(geo,new THREE.LineBasicMaterial({color,linewidth:2}));return obj;}
+function makeCurve(fn,color,n=220){const pts=[];for(let i=0;i<=n;i++)pts.push(fn(i/n));return makeLine(pts,color);}
+function addArrow(group,p,q,color,head=.12){const d=q.clone().sub(p),len=d.length();if(len<1e-6)return;const dir=d.normalize();const shaftLen=Math.max(.001,len-head*.7);const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,shaftLen,7),new THREE.MeshBasicMaterial({color}));shaft.position.copy(p).addScaledVector(dir,shaftLen/2);shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);group.add(shaft);const cone=new THREE.Mesh(new THREE.ConeGeometry(head*.42,head,9),new THREE.MeshBasicMaterial({color}));cone.position.copy(p).addScaledVector(dir,shaftLen+head*.45);cone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);group.add(cone);}
+function addBoundaryArrows(group){const pos=[.18,.38,.62,.82],eps=.035,type=$('tipo').value;for(const a of pos){for(const vv of [0,1])addArrow(group,F(a-eps,vv),F(a+eps,vv),green,.10);}
+ const dirRight=type==='Toro'?1:-1;for(const a of pos){addArrow(group,F(0,a-eps),F(0,a+eps),red,.10);if(dirRight===1)addArrow(group,F(1,a-eps),F(1,a+eps),red,.10);else addArrow(group,F(1,a+eps),F(1,a-eps),red,.10);}}
+function rebuild3D(){if(!scene)return;if(surfaceGroup){scene.remove(surfaceGroup);disposeTree(surfaceGroup);}surfaceGroup=new THREE.Group();const N=100,M=100,verts=[],uvs=[],indices=[];for(let i=0;i<=N;i++){for(let j=0;j<=M;j++){const p=F(i/N,j/M);verts.push(p.x,p.y,p.z);uvs.push(i/N,j/M);}}
+ for(let i=0;i<N;i++)for(let j=0;j<M;j++){const a=i*(M+1)+j,b=a+M+1;indices.push(a,b,a+1,b,b+1,a+1);}const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geo.setIndex(indices);geo.computeVertexNormals();const mat=new THREE.MeshStandardMaterial({color:0x9bdcff,side:THREE.DoubleSide,transparent:true,opacity:.83,roughness:.48,metalness:.02});const mesh=new THREE.Mesh(geo,mat);surfaceGroup.add(mesh);
+ // Boundary curves are shown distinctly even during the deformation.
+ surfaceGroup.add(makeCurve(u=>F(u,0),green),makeCurve(u=>F(u,1),green),makeCurve(v=>F(0,v),red),makeCurve(v=>F(1,v),red));
+ addBoundaryArrows(surfaceGroup);const p=F(+$('u0').value,+$('v0').value);const marker=new THREE.Mesh(new THREE.SphereGeometry(.075,20,14),new THREE.MeshStandardMaterial({color:blue,emissive:0x102dff,roughness:.3}));marker.position.copy(p);surfaceGroup.add(marker);scene.add(surfaceGroup);$('status').textContent=`Superfície: ${$('tipo').value}. Malha: ${N} × ${M} células; ponto azul em (u,v)=(${$('u0').value}, ${$('v0').value}).`;
+}
+function disposeTree(root){root.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});}
+function drawSquare(){const svg=$('square'),type=$('tipo').value,u=+$('u0').value,v=+$('v0').value;const x=18+u*400,y=418-v*400;let s=`<defs><marker id="ag" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#35d979"/></marker><marker id="ar" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#ff5f68"/></marker></defs><rect x="18" y="18" width="400" height="400" rx="1" fill="#9bdcff" fill-opacity=".22" stroke="#dbeafe" stroke-width="2"/><path d="M18 18H418 M18 418H418" stroke="#35d979" stroke-width="5"/><path d="M18 18V418 M418 18V418" stroke="#ff5f68" stroke-width="5"/>`;
+ for(const yy of [24,412])for(const xx of [0.14,.36,.58,.80]){const a=18+xx*400;s+=`<path d="M${a} ${yy}h30" stroke="#35d979" stroke-width="2.5" marker-end="url(#ag)"/>`;}
+ for(const xx of [24,412])for(const yy of [.14,.36,.58,.80]){const cy=418-yy*400;let y1=cy-25,y2=cy+25;if(type==='Klein'&&xx===412){y1=cy+25;y2=cy-25;}s+=`<path d="M${xx} ${y1} L${xx} ${y2}" stroke="#ff5f68" stroke-width="2.5" marker-end="url(#ar)"/>`;}
+ s+=`<circle cx="${x}" cy="${y}" r="7.5" fill="#316dff" stroke="#fff" stroke-width="2"/><text x="218" y="8" fill="#e8f0ff" font-size="14" text-anchor="middle">${type==='Toro'?'Toro':'Garrafa de Klein'}</text>`;svg.innerHTML=s;}
+function update(){
+  $('sval').textContent=(+$('s').value).toFixed(2);
+  $('tval').textContent=(+$('t').value).toFixed(2);
+  $('uval').textContent=(+$('u0').value).toFixed(2);
+  $('vval').textContent=(+$('v0').value).toFixed(2);
+  drawSquare();
+  rebuild3D();
+}
+function init(){scene=new THREE.Scene();scene.background=new THREE.Color(0x08111e);camera=new THREE.PerspectiveCamera(42,1,.1,100);camera.position.set(4.4,5.0,6.2);renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;view.insertBefore(renderer.domElement,view.firstChild);controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.target.set(0,0,0);scene.add(new THREE.AmbientLight(0xffffff,1.35));const light=new THREE.DirectionalLight(0xffffff,2.1);light.position.set(4,6,5);scene.add(light);const light2=new THREE.DirectionalLight(0x76bfff,.8);light2.position.set(-5,-2,-4);scene.add(light2);surfaceGroup=new THREE.Group();scene.add(surfaceGroup);resize();update();animate();}
+function resize(){if(!renderer)return;const w=Math.max(1,view.clientWidth),h=Math.max(1,view.clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+function animate(){requestAnimationFrame(animate);if(!renderer)return;controls.update();renderer.render(scene,camera);}
+for(const id of ['tipo','s','t','u0','v0'])$(id).addEventListener('input',update);
+$('resetView').addEventListener('click',()=>{camera.position.set(4.4,5,6.2);controls.target.set(0,0,0);controls.update();});$('resetAll').addEventListener('click',()=>{$('tipo').value='Toro';$('s').value=0;$('t').value=0;$('u0').value=.35;$('v0').value=.60;update();});$('fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch(e){$('status').textContent='A tela cheia não está disponível neste modo de incorporação. Abra a página diretamente para usar esse recurso.';}});window.addEventListener('resize',resize);document.addEventListener('fullscreenchange',()=>setTimeout(resize,100));init();
+</script></body></html>
