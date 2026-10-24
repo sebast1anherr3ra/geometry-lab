@@ -34,12 +34,25 @@ function updateFullscreenButton(){
   resizeRenderer();
 }
 async function toggleFullscreen(){
+  if(document.fullscreenElement){
+    try { await document.exitFullscreen(); } catch(err) { /* O navegador pode bloquear a saída via script. */ }
+    return;
+  }
   try{
-    if(document.fullscreenElement){await document.exitFullscreen();}
-    else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();}
-    else {alert('A tela inteira não é suportada neste navegador. Abra a visualização diretamente no navegador e tente novamente.');}
+    const target=document.documentElement;
+    if(target.requestFullscreen){
+      await target.requestFullscreen();
+      return;
+    }
+    throw new Error('Fullscreen API indisponível');
   }catch(err){
-    alert('O navegador ou a incorporação bloqueou a tela inteira. Abra a visualização diretamente pelo endereço do Geometric Lab e tente novamente.');
+    // Em uma incorporação do Google Sites, a permissão de tela inteira pode
+    // ser bloqueada pelo iframe. Como alternativa, abre a própria visualização
+    // numa aba separada, onde os controles ocupam a janela inteira.
+    const opened=window.open(window.location.href,'_blank','noopener');
+    if(!opened){
+      alert('A incorporação bloqueou a tela inteira e o navegador também bloqueou a nova aba. Abra a visualização pelo endereço público do Geometric Lab.');
+    }
   }
 }
 fullscreenButton.addEventListener('click',toggleFullscreen);
