@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07111f">
+<title>Geometric Lab — Fibração de Hopf</title>
+<style>
+:root{color-scheme:dark;--bg:#07111f;--panel:rgba(11,25,43,.91);--line:rgba(170,205,235,.2);--text:#eaf3ff;--muted:#9fb4cb;--blue:#4f8dff;--gold:#e6b800}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+body{min-height:100dvh}
+#app{position:relative;width:100%;height:100%;height:100dvh;background:radial-gradient(ellipse at 50% 0%,#102b48 0%,#07111f 62%)}
+header{position:absolute;z-index:5;left:16px;top:14px;pointer-events:none}
+.brand{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#8cb9e5;font-weight:750}
+h1{font-size:clamp(17px,2.2vw,24px);margin:5px 0 0;font-weight:620;letter-spacing:-.025em}
+#scenes{position:absolute;inset:68px 0 116px;display:grid;grid-template-columns:1fr 1fr;gap:1px}
+.scene{position:relative;min-width:0;min-height:0;overflow:hidden}
+.scene canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
+.scene-label{position:absolute;top:12px;left:14px;z-index:2;padding:7px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(5,14,26,.62);backdrop-filter:blur(8px);font-size:12px;color:#d9e9fa;pointer-events:none}
+.scene-label small{display:block;margin-top:3px;color:var(--muted);font-size:10px}
+#controls{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX(-50%);width:min(920px,calc(100% - 24px));padding:12px 14px 10px;background:var(--panel);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(18px);box-shadow:0 12px 38px #0005}
+.control-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.control-title{font-size:12px;font-weight:650;letter-spacing:.02em}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;color:var(--text);background:#162b42;border:1px solid #2c4967;border-radius:9px;padding:7px 10px;font-size:11px;cursor:pointer}
+button:hover{background:#203e5d}button:focus-visible,input:focus-visible{outline:2px solid #7bbaff;outline-offset:2px}
+.sliders{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.control{min-width:0}.control-top{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:11px;color:#c8d8e9;margin-bottom:5px}
+.control output{font-variant-numeric:tabular-nums;color:#fff;font-size:11px}
+input[type=range]{width:100%;accent-color:#73b5ff;margin:0;cursor:pointer}
+.legend{display:flex;align-items:center;gap:13px;flex-wrap:wrap;margin-top:9px;color:var(--muted);font-size:10px}
+.key{display:inline-flex;align-items:center;gap:5px}.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+#status{position:absolute;z-index:10;inset:0;display:none;align-items:center;justify-content:center;padding:24px;text-align:center;background:#07111fee;color:#dcecff}
+#status.visible{display:flex}.status-card{max-width:560px;border:1px solid var(--line);border-radius:14px;background:#0d2035;padding:18px}
+.status-card p{color:var(--muted);font-size:13px;line-height:1.55}
+@media(max-width:720px){
+ header{top:10px;left:12px}#scenes{inset:58px 0 206px;grid-template-columns:1fr;grid-template-rows:1fr 1fr}
+ .scene-label{top:6px;left:8px;padding:5px 8px;font-size:11px}
+ #controls{bottom:7px;width:calc(100% - 14px);padding:10px;border-radius:13px}
+ .control-head{margin-bottom:8px}.control-title{font-size:11px}.actions{gap:4px}
+ button{padding:7px 8px;font-size:10px}
+ .sliders{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 12px}
+ .legend{gap:8px;margin-top:7px}
+}
+@media(max-height:650px) and (min-width:721px){
+ #scenes{inset:58px 0 98px}#controls{bottom:6px;padding:8px 12px}.sliders{gap:8px}.legend{margin-top:5px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header><div class="brand">Geometric Lab</div><h1>Fibração de Hopf</h1></header>
+  <main id="scenes" aria-label="Duas visualizações tridimensionais">
+    <section class="scene" id="base-scene"><div class="scene-label">Base <i>S²</i><small>Região U e dois pontos</small></div></section>
+    <section class="scene" id="total-scene"><div class="scene-label">Preimagem em ℝ³<small>Quatro paredes e duas fibras</small></div></section>
+  </main>
+  <section id="controls" aria-label="Controles matemáticos">
+    <div class="control-head"><div class="control-title">Parâmetros dos pontos na base</div><div class="actions">
+      <button id="reset" type="button">↺ Reiniciar</button>
+      <button id="fullscreen" type="button">⛶ Tela inteira</button>
+      <button id="open-tab" type="button" hidden>Abrir em nova aba ↗</button>
+    </div></div>
+    <div class="sliders">
+      <label class="control"><span class="control-top"><span>η azul</span><output id="eta0-out">0.45</output></span><input id="eta0" type="range" min="0.35" max="0.65" step="0.01" value="0.45"></label>
+      <label class="control"><span class="control-top"><span>φ azul</span><output id="phi0-out">−0.20</output></span><input id="phi0" type="range" min="-0.50" max="0.50" step="0.01" value="-0.20"></label>
+      <label class="control"><span class="control-top"><span>η amarelo</span><output id="eta1-out">0.55</output></span><input id="eta1" type="range" min="0.35" max="0.65" step="0.01" value="0.55"></label>
+      <label class="control"><span class="control-top"><span>φ amarelo</span><output id="phi1-out">0.25</output></span><input id="phi1" type="range" min="-0.50" max="0.50" step="0.01" value="0.25"></label>
+    </div>
+    <div class="legend">
+      <span class="key"><i class="dot" style="background:#254fbd"></i>Ponto/fibra azul</span>
+      <span class="key"><i class="dot" style="background:#e6b800"></i>Ponto/fibra amarela</span>
+      <span class="key"><i class="dot" style="background:#4fc27a"></i>Bordas η constante</span>
+      <span class="key"><i class="dot" style="background:#ef6268"></i>Bordas φ constante</span>
+      <span>Arraste para girar · roda/pinça para zoom</span>
+    </div>
+  </section>
+  <div id="status"><div class="status-card"><strong>Não foi possível iniciar a visualização 3D.</strong><p id="status-message">Verifique sua conexão com a internet e recarregue a página. Esta página carrega Three.js por CDN.</p></div></div>
+</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = id => document.getElementById(id);
+const PI = Math.PI;
+const etaMin=.35, etaMax=.65, phiMin=-.50, phiMax=.50;
+const defaults={eta0:.45,phi0:-.20,eta1:.55,phi1:.25};
+const status = $('status');
+function showError(message){ $('status-message').textContent=message; status.classList.add('visible'); }
+function v3(a){return new THREE.Vector3(a[0],a[1],a[2]);}
+
+// Tradução direta de proj_hopf(eta, phi, t) do SageMath.
+// A projeção é (x1,x2,x3)/(1-x4), com x em S³ ⊂ ℝ⁴.
+function projHopf(eta,phi,t){
+  const x1=Math.cos(eta)*Math.cos(t), x2=Math.cos(eta)*Math.sin(t);
+  const x3=Math.sin(eta)*Math.cos(t+phi), x4=Math.sin(eta)*Math.sin(t+phi);
+  const d=1-x4;
+  if(Math.abs(d)<1e-9) return null;
+  return [x1/d,x2/d,x3/d];
+}
+function basePoint(eta,phi){return [Math.sin(2*eta)*Math.cos(phi),Math.sin(2*eta)*Math.sin(phi),Math.cos(2*eta)];}
+function material(color,opacity=1,side=THREE.DoubleSide){return new THREE.MeshStandardMaterial({color,transparent:opacity<1,opacity,side,roughness:.7,metalness:.02,depthWrite:opacity>=.95});}
+
+function makeScene(host, isBase){
+  const scene=new THREE.Scene(); scene.background=new THREE.Color('#07111f');
+  const camera=new THREE.PerspectiveCamera(42,1,.01,1000);
+  camera.position.set(isBase?2.7:3.8,isBase?2.1:2.5,isBase?3.0:4.4);
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  renderer.outputColorSpace=THREE.SRGBColorSpace;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.15;
+  host.appendChild(renderer.domElement);
+  const controls=new OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true; controls.dampingFactor=.07; controls.enablePan=true;
+  controls.minDistance=isBase?1.4:.7; controls.maxDistance=isBase?8:30;
+  scene.add(new THREE.HemisphereLight(0xc9e5ff,0x162236,2.0));
+  const key=new THREE.DirectionalLight(0xffffff,2.0); key.position.set(4,5,6); scene.add(key);
+  const rim=new THREE.DirectionalLight(0x5c9eff,1.1); rim.position.set(-4,-2,-5); scene.add(rim);
+  const resize=()=>{const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);};
+  const ro=new ResizeObserver(resize); ro.observe(host); resize();
+  return {host,scene,camera,renderer,controls,resize,ro,isBase};
+}
+const base=makeScene($('base-scene'),true);
+const total=makeScene($('total-scene'),false);
+
+function addLine(scene, points, color, radius=.009, closed=false){
+  const curve=new THREE.CatmullRomCurve3(points.map(v3),closed,'centripetal');
+  const obj=new THREE.Mesh(new THREE.TubeGeometry(curve,Math.max(80,points.length*2),radius,6,closed),new THREE.MeshStandardMaterial({color,roughness:.48,metalness:.03}));
+  scene.add(obj); return obj;
+}
+function lineFromFunction(scene, fn, start, end, count, color, radius){
+  const pts=[];for(let i=0;i<=count;i++){const p=fn(start+(end-start)*i/count);if(p)pts.push(v3(p));}
+  if(pts.length>1){const curve=new THREE.CatmullRomCurve3(pts,false,'centripetal');const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,count,radius,5,false),new THREE.MeshStandardMaterial({color,roughness:.5}));scene.add(mesh);return mesh;}
+}
+function addParamSurface(scene, fn, u0,u1,nu,v0,v1,nv,color,opacity){
+  const positions=[],indices=[];
+  for(let i=0;i<=nu;i++)for(let j=0;j<=nv;j++){const p=fn(u0+(u1-u0)*i/nu,v0+(v1-v0)*j/nv);positions.push(...(p||[0,0,0]));}
+  for(let i=0;i<nu;i++)for(let j=0;j<nv;j++){
+    const a=i*(nv+1)+j,b=a+nv+1;
+    const pa=fn(u0+(u1-u0)*i/nu,v0+(v1-v0)*j/nv);
+    const pb=fn(u0+(u1-u0)*(i+1)/nu,v0+(v1-v0)*j/nv);
+    const pc=fn(u0+(u1-u0)*i/nu,v0+(v1-v0)*(j+1)/nv);
+    const pd=fn(u0+(u1-u0)*(i+1)/nu,v0+(v1-v0)*(j+1)/nv);
+    if(pa&&pb&&pc&&pd)indices.push(a,b,a+1,b,b+1,a+1);
+  }
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geo.setIndex(indices);geo.computeVertexNormals();
+  const mesh=new THREE.Mesh(geo,material(color,opacity));scene.add(mesh);return mesh;
+}
+function makePoint(scene,color,radius){
+  const obj=new THREE.Mesh(new THREE.SphereGeometry(radius,24,16),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.16,roughness:.35}));
+  scene.add(obj);return obj;
+}
+function makeSphere(scene,radius,opacity,color){
+  const m=new THREE.Mesh(new THREE.SphereGeometry(radius,48,32),material(color,opacity));
+  scene.add(m);return m;
+}
+
+// Base S²: esfera de fundo, região U, bordas eta e phi.
+makeSphere(base.scene,1,.19,'#d3d3d3');
+addParamSurface(base.scene,(s,f)=>basePoint(s,f),etaMin,etaMax,40,phiMin,phiMax,32,'#b9ddf5',.82);
+for(const e of [etaMin,etaMax]){
+  const pts=[];for(let i=0;i<=120;i++)pts.push(basePoint(e,phiMin+(phiMax-phiMin)*i/120));
+  addLine(base.scene,pts,'#35c878',.009);
+}
+for(const f of [phiMin,phiMax]){
+  const pts=[];for(let i=0;i<=90;i++)pts.push(basePoint(etaMin+(etaMax-etaMin)*i/90,f));
+  addLine(base.scene,pts,'#ef6268',.009);
+}
+const bluePoint=makePoint(base.scene,'#254fbd',.035);
+const goldPoint=makePoint(base.scene,'#e6b800',.035);
+const axes=new THREE.AxesHelper(1.22);axes.material.transparent=true;axes.material.opacity=.42;base.scene.add(axes);
+
+// Preimagem: superfícies das quatro bordas. Primeiro, as quatro paredes de fundo
+// em baixa opacidade e depois as superfícies coloridas como no código SageMath.
+const wallSpecs=[
+  {fn:(u,v)=>projHopf(etaMin,v,u),u0:0,u1:2*PI,nu:88,v0:phiMin,v1:phiMax,nv:30,c:'#dceeff'},
+  {fn:(u,v)=>projHopf(etaMax,v,u),u0:0,u1:2*PI,nu:88,v0:phiMin,v1:phiMax,nv:30,c:'#dceeff'},
+  {fn:(u,v)=>projHopf(v,phiMin,u),u0:0,u1:2*PI,nu:88,v0:etaMin,v1:etaMax,nv:30,c:'#dceeff'},
+  {fn:(u,v)=>projHopf(v,phiMax,u),u0:0,u1:2*PI,nu:88,v0:etaMin,v1:etaMax,nv:30,c:'#dceeff'}
+];
+for(const w of wallSpecs)addParamSurface(total.scene,w.fn,w.u0,w.u1,w.nu,w.v0,w.v1,w.nv,w.c,.16);
+addParamSurface(total.scene,wallSpecs[0].fn,0,2*PI,88,phiMin,phiMax,30,'#b7e4c7',.65);
+addParamSurface(total.scene,wallSpecs[1].fn,0,2*PI,88,phiMin,phiMax,30,'#b7e4c7',.65);
+addParamSurface(total.scene,wallSpecs[2].fn,0,2*PI,88,etaMin,etaMax,30,'#f7c6c7',.65);
+addParamSurface(total.scene,wallSpecs[3].fn,0,2*PI,88,etaMin,etaMax,30,'#f7c6c7',.65);
+const blueFiber=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshStandardMaterial({color:'#254fbd',roughness:.35,metalness:.08}));
+const goldFiber=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshStandardMaterial({color:'#e6b800',roughness:.35,metalness:.08}));
+total.scene.add(blueFiber,goldFiber);
+function setFiber(mesh,eta,phi){
+  const pts=[];for(let i=0;i<=400;i++){const p=projHopf(eta,phi,2*PI*i/400);if(p)pts.push(v3(p));}
+  const curve=new THREE.CatmullRomCurve3(pts,true,'centripetal');
+  const old=mesh.geometry;mesh.geometry=new THREE.TubeGeometry(curve,500,.012,8,true);old.dispose();
+}
+const uiKeys=['eta0','phi0','eta1','phi1'];
+function readValues(){return Object.fromEntries(uiKeys.map(k=>[k,Number($(k).value)]));}
+function update(){
+  const p=readValues();
+  for(const k of uiKeys){$(k+'-out').textContent=p[k].toFixed(2).replace('-', '−');}
+  bluePoint.position.copy(v3(basePoint(p.eta0,p.phi0)));
+  goldPoint.position.copy(v3(basePoint(p.eta1,p.phi1)));
+  setFiber(blueFiber,p.eta0,p.phi0);setFiber(goldFiber,p.eta1,p.phi1);
+}
+uiKeys.forEach(k=>$(k).addEventListener('input',update));
+$('reset').addEventListener('click',()=>{for(const [k,v] of Object.entries(defaults))$(k).value=v;update();});
+let animationPaused=false;
+function animate(){requestAnimationFrame(animate);base.controls.update();total.controls.update();base.renderer.render(base.scene,base.camera);total.renderer.render(total.scene,total.camera);}
+update();animate();
+
+// Tela inteira: em alguns iframes do Google Sites o navegador não permite a API.
+// A opção de nova aba aparece como alternativa explícita se o modo falhar/indisponível.
+const fsButton=$('fullscreen'),openButton=$('open-tab');
+function syncFsLabel(){fsButton.textContent=document.fullscreenElement?'⤢ Sair da tela inteira':'⛶ Tela inteira';}
+document.addEventListener('fullscreenchange',syncFsLabel);
+fsButton.addEventListener('click',()=>{
+  if(document.fullscreenElement){document.exitFullscreen?.().catch(()=>{});return;}
+  if(document.documentElement.requestFullscreen){
+    document.documentElement.requestFullscreen().then(()=>{openButton.hidden=true;}).catch(()=>{openButton.hidden=false;});
+  }else{openButton.hidden=false;}
+});
+openButton.addEventListener('click',()=>{
+  // Deve ocorrer diretamente no gesto do usuário para reduzir bloqueios de pop-up.
+  const w=window.open(window.location.href,'_blank','noopener,noreferrer');
+  if(!w)openButton.textContent='Pop-up bloqueado — use o menu do navegador';
+});
+if(window.self!==window.top){openButton.hidden=false;}
+window.addEventListener('error',e=>{if(e.message)showError('Erro na visualização: '+e.message);});
+window.addEventListener('unhandledrejection',e=>showError('Falha ao inicializar a visualização. '+String(e.reason||'')));
+</script>
+</body>
+</html>
