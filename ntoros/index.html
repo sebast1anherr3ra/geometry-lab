@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07111f">
+<title>Geometric Lab — Bitoro grosso</title>
+<style>
+:root{color-scheme:dark;--bg:#07111f;--panel:rgba(10,24,41,.94);--line:#29435d;--text:#eaf3ff;--muted:#9bb1c9}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{position:relative;width:100%;height:100%;height:100dvh;background:radial-gradient(ellipse at 50% 0%,#122b45,#07111f 65%)}
+header{position:absolute;top:12px;left:16px;z-index:4;pointer-events:none}.brand{font-size:10px;letter-spacing:.22em;color:#8bbce9;font-weight:800}.heading{font-size:clamp(17px,2.2vw,23px);margin-top:4px;font-weight:650}
+#view{position:absolute;inset:54px 0 130px;touch-action:none}#view canvas{display:block;width:100%;height:100%;touch-action:none}
+#panel{position:absolute;z-index:5;left:50%;bottom:10px;transform:translateX(-50%);width:min(900px,calc(100% - 20px));padding:12px 14px;background:var(--panel);border:1px solid #29435dcc;border-radius:15px;backdrop-filter:blur(16px);box-shadow:0 12px 34px #0005}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.section{font-size:12px;font-weight:700}.buttons{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;color:var(--text);background:#162c43;border:1px solid #35516d;border-radius:8px;padding:7px 9px;font-size:11px;cursor:pointer}button:hover{background:#23425f}button:focus-visible,input:focus-visible{outline:2px solid #7bbaff;outline-offset:2px}
+.controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 14px}.field{display:flex;flex-direction:column;gap:5px;min-width:0}.range-head{display:flex;justify-content:space-between;gap:6px;font-size:10px;color:#bdcfe1}.range-head output{color:#fff;font-variant-numeric:tabular-nums}input[type=range]{width:100%;accent-color:#80baff;margin:0}
+.note{font-size:10px;color:var(--muted);line-height:1.4;margin-top:8px}
+#status{display:none;position:absolute;inset:0;z-index:10;align-items:center;justify-content:center;padding:20px;background:#07111fee}#status.show{display:flex}.message{max-width:560px;padding:18px;background:#10243a;border:1px solid var(--line);border-radius:12px;font-size:13px;line-height:1.55}.message p{color:var(--muted)}
+@media(max-width:680px){header{top:8px;left:11px}#view{inset:48px 0 238px}#panel{bottom:6px;width:calc(100% - 12px);padding:9px;border-radius:12px}.top{align-items:flex-start;margin-bottom:7px}.section{font-size:11px}button{padding:6px 7px;font-size:10px}.controls{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 11px}.note{margin-top:6px}}
+@media(max-height:570px) and (min-width:681px){#view{inset:48px 0 116px}#panel{padding:8px 11px;bottom:5px}.controls{gap:7px 10px}.note{margin-top:5px}}
+</style>
+</head>
+<body>
+<div id="app">
+<header><div class="brand">GEOMETRIC LAB</div><div class="heading">Bitoro grosso · superfícies implícitas</div></header>
+<div id="view" aria-label="Superfície implícita 3D"></div>
+<section id="panel">
+ <div class="top"><div class="section">Parâmetros da superfície</div><div class="buttons"><button id="reset">↺ Reiniciar</button><button id="fullscreen">⛶ Tela inteira</button><button id="open" hidden>Abrir em nova aba ↗</button></div></div>
+ <div class="controls">
+  <label class="field"><span class="range-head"><span>Número de buracos h</span><output id="h-out">3</output></span><input id="h" type="range" min="1" max="4" step="1" value="3"></label>
+  <label class="field"><span class="range-head"><span>Distância b</span><output id="b-out">0.4</output></span><input id="b" type="range" min="0.3" max="1" step="0.1" value="0.4"></label>
+  <label class="field"><span class="range-head"><span>Expoente k</span><output id="k-out">8.0</output></span><input id="k" type="range" min="0.4" max="10" step="0.1" value="8"></label>
+  <label class="field"><span class="range-head"><span>Zoom (alcance)</span><output id="zoom-out">12</output></span><input id="zoom" type="range" min="2" max="25" step="1" value="12"></label>
+ </div>
+ <div class="note">Superfície implícita z^(2k) = F₀ · Fprod. Os limites x, y e z se adaptam aos parâmetros para evitar cortes; a malha usa resolução adaptativa e normais suavizadas. O cálculo é numérico e pode ficar mais lento para parâmetros extremos.</div>
+</section>
+<div id="status"><div class="message"><strong>Não foi possível iniciar a visualização 3D.</strong><p id="err"></p></div></div>
+</div>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
+const $=id=>document.getElementById(id);
+function error(msg){$('err').textContent=msg;$('status').classList.add('show');}
+const host=$('view'),scene=new THREE.Scene();scene.background=new THREE.Color('#07111f');
+const camera=new THREE.PerspectiveCamera(42,1,.05,1000);camera.position.set(13,10,15);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.75));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;host.appendChild(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.075;controls.minDistance=1.5;controls.maxDistance=100;controls.target.set(3,0,0);
+scene.add(new THREE.HemisphereLight(0xd9ebff,0x182436,2.1));
+const keyLight=new THREE.DirectionalLight(0xffffff,2.2);keyLight.position.set(8,10,9);scene.add(keyLight);
+const rim=new THREE.DirectionalLight(0x4e9bff,1.0);rim.position.set(-7,-2,-6);scene.add(rim);
+const axes=new THREE.AxesHelper(3);axes.material.transparent=true;axes.material.opacity=.22;scene.add(axes);
+let surface=null;
+const mat=new THREE.MeshStandardMaterial({color:'#83d4ff',roughness:.42,metalness:.015,side:THREE.DoubleSide,transparent:true,opacity:.88});
+const DEFAULTS={h:3,b:.4,k:8,zoom:12};
+function equation(x,y,z,h,b,k){
+ const a=(2*h+1)*b,xh=x/h;
+ const F0=a*a-(xh-a)*(xh-a)-y*y;
+ let prod=1;
+ for(let i=1;i<=h;i++){const xi=(4*i-1)*b;prod*=((xh-xi)*(xh-xi)+y*y-b*b);}
+ return Math.pow(Math.abs(z),2*k)-F0*prod;
+}
+// Marching tetrahedra: extract an isosurface of F=0 from the sampled implicit function.
+function polygonize(h,b,k,zoom){
+ const a=(2*h+1)*b;
+ // F0 só pode ser não negativo dentro desta elipse; fora dela não há pontos reais da superfície.
+ // Como a equação usa x/h, o alcance em x é 2*h*a (não apenas 2*a).
+ const xmin=0,xmax=2*h*a+0.35;
+ const ymin=-(a+0.35),ymax=a+0.35;
+ // Estima o maior valor positivo de F0*Fprod na região admissível para escolher um limite z
+ // que contenha os dois lados da superfície, em vez de cortá-la num limite fixo.
+ let maxRhs=0;
+ const probe=180;
+ for(let i=0;i<=probe;i++){
+  const xh=2*a*i/probe;
+  for(let j=0;j<=probe;j++){
+   const y=-a+2*a*j/probe;
+   const F0=a*a-(xh-a)*(xh-a)-y*y;
+   if(F0<=0)continue;
+   let prod=1;
+   for(let q=1;q<=h;q++){const xi=(4*q-1)*b;prod*=((xh-xi)*(xh-xi)+y*y-b*b);}
+   const rhs=F0*prod;
+   if(Number.isFinite(rhs)&&rhs>maxRhs)maxRhs=rhs;
+  }
+ }
+ const zExtent=Math.max(0.75,Math.pow(Math.max(maxRhs*1.35,1e-12),1/(2*k))*1.12+0.25);
+ const zmin=-zExtent,zmax=zExtent;
+ // Densidade adaptada ao tamanho real da região para não perder resolução quando h ou b aumentam.
+ const nx=Math.max(112,Math.min(240,Math.ceil((xmax-xmin)*7.5)));
+ const ny=Math.max(112,Math.min(200,Math.ceil((ymax-ymin)*8.5)));
+ const nz=Math.max(88,Math.min(180,Math.ceil((zmax-zmin)*7.5)));
+
+ const dx=(xmax-xmin)/nx,dy=(ymax-ymin)/ny,dz=(zmax-zmin)/nz;
+ const values=new Float32Array((nx+1)*(ny+1)*(nz+1));
+ const idx=(i,j,l)=>(i*(ny+1)+j)*(nz+1)+l;
+ for(let i=0;i<=nx;i++){const x=xmin+i*dx;for(let j=0;j<=ny;j++){const y=ymin+j*dy;for(let l=0;l<=nz;l++){const z=zmin+l*dz;let val=equation(x,y,z,h,b,k);if(!Number.isFinite(val))val=1e30;values[idx(i,j,l)]=Math.max(-1e30,Math.min(1e30,val));}}}
+ const positions=[];
+ const cubeTets=[[0,5,1,6],[0,1,2,6],[0,2,3,6],[0,3,7,6],[0,7,4,6],[0,4,5,6]];
+ const offsets=[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
+ const interp=(p1,p2,v1,v2)=>{let t=v1/(v1-v2);if(!Number.isFinite(t))t=.5;t=Math.max(0,Math.min(1,t));return [p1[0]+t*(p2[0]-p1[0]),p1[1]+t*(p2[1]-p1[1]),p1[2]+t*(p2[2]-p1[2])];};
+ const addTri=(a,b,c)=>{positions.push(...a,...b,...c);};
+ for(let i=0;i<nx;i++)for(let j=0;j<ny;j++)for(let l=0;l<nz;l++){
+  const ps=[],vs=[];let min=Infinity,max=-Infinity;
+  for(const o of offsets){const ii=i+o[0],jj=j+o[1],ll=l+o[2];ps.push([xmin+ii*dx,ymin+jj*dy,zmin+ll*dz]);const v=values[idx(ii,jj,ll)];vs.push(v);min=Math.min(min,v);max=Math.max(max,v);}
+  if(min>0||max<0)continue;
+  for(const tet of cubeTets){
+   const inside=[],outside=[];for(const id of tet)(vs[id]<=0?inside:outside).push(id);
+   if(inside.length===0||inside.length===4)continue;
+   if(inside.length===1){const a=inside[0];addTri(interp(ps[a],ps[outside[0]],vs[a],vs[outside[0]]),interp(ps[a],ps[outside[1]],vs[a],vs[outside[1]]),interp(ps[a],ps[outside[2]],vs[a],vs[outside[2]]));}
+   else if(inside.length===3){const a=outside[0];addTri(interp(ps[a],ps[inside[0]],vs[a],vs[inside[0]]),interp(ps[a],ps[inside[2]],vs[a],vs[inside[2]]),interp(ps[a],ps[inside[1]],vs[a],vs[inside[1]]));}
+   else {const a=inside[0],b0=inside[1],c=outside[0],d=outside[1];const ac=interp(ps[a],ps[c],vs[a],vs[c]),ad=interp(ps[a],ps[d],vs[a],vs[d]),bc=interp(ps[b0],ps[c],vs[b0],vs[c]),bd=interp(ps[b0],ps[d],vs[b0],vs[d]);addTri(ac,bc,ad);addTri(ad,bc,bd);}
+  }
+ }
+ const rawGeo=new THREE.BufferGeometry();
+ rawGeo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+ // Unifica vértices coincidentes para calcular normais suaves e reduzir o aspecto facetado.
+ const geo=mergeVertices(rawGeo,1e-4);
+ rawGeo.dispose();
+ geo.computeVertexNormals();
+ return geo;
+}
+let rebuildToken=0;
+function update(){
+ const token=++rebuildToken;
+ const h=Number($('h').value),b=Number($('b').value),k=Number($('k').value),zoom=Number($('zoom').value);
+ $('h-out').textContent=h;$('b-out').textContent=b.toFixed(1);$('k-out').textContent=k.toFixed(1);$('zoom-out').textContent=zoom;
+ // Rebuild synchronously on slider change. If a browser is slow, try a smaller zoom.
+ try{
+  const geo=polygonize(h,b,k,zoom);if(token!==rebuildToken){geo.dispose();return;}
+  if(surface){scene.remove(surface);surface.geometry.dispose();}
+  surface=new THREE.Mesh(geo,mat);scene.add(surface);
+  const a=(2*h+1)*b;controls.target.set(a,0,0);
+  camera.position.set(a+Math.max(5,zoom*.65),Math.max(4,zoom*.45),Math.max(5,zoom*.75));controls.update();
+ }catch(e){error('Falha ao construir a superfície: '+e.message);}
+}
+for(const id of ['h','b','k','zoom'])$(id).addEventListener('change',update);
+$('reset').addEventListener('click',()=>{for(const [id,v] of Object.entries(DEFAULTS))$(id).value=v;update();});
+const resize=()=>{const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);};
+const ro=new ResizeObserver(resize);ro.observe(host);resize();
+function animate(){requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);}update();animate();
+const fs=$('fullscreen'),open=$('open');
+document.addEventListener('fullscreenchange',()=>fs.textContent=document.fullscreenElement?'⤢ Sair da tela inteira':'⛶ Tela inteira');
+fs.addEventListener('click',()=>{if(document.fullscreenElement){document.exitFullscreen?.().catch(()=>{});return;}if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen().then(()=>open.hidden=true).catch(()=>open.hidden=false);else open.hidden=false;});
+if(window.self!==window.top)open.hidden=false;
+open.addEventListener('click',()=>{const w=window.open(location.href,'_blank','noopener,noreferrer');if(!w)open.textContent='Pop-up bloqueado';});
+window.addEventListener('error',e=>{if(e.message)error(e.message);});window.addEventListener('unhandledrejection',e=>error(String(e.reason||'Falha ao carregar Three.js.')));
+</script>
+</body>
+</html>
