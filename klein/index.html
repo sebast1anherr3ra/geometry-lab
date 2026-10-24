@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Garrafa de Klein e semirreta</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121e31;--line:#2a3b55;--text:#e8eef8;--muted:#aab8cc;--accent:#72c7ff}
+*{box-sizing:border-box}body{margin:0;padding:18px;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:1200px;margin:auto}.head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px}
+h1{font-size:clamp(1.35rem,3vw,2rem);line-height:1.2;margin:0 0 8px}.sub,.hint{color:var(--muted);margin:0}
+.actions{display:flex;flex-wrap:wrap;gap:8px}.actions button{white-space:nowrap}
+button{border:1px solid #3b506f;background:#182943;color:var(--text);border-radius:9px;padding:9px 12px;cursor:pointer}button:hover{background:#233b5c}
+.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.control,.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+.control label{display:flex;justify-content:space-between;gap:10px;font-weight:600;margin-bottom:8px}.control output{color:var(--accent);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}.panels{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.panel h2{font-size:1.05rem;margin:0 0 10px}.view3d{height:min(72vh,720px);min-height:380px;position:relative;overflow:hidden;border-radius:10px;background:#080f1c}
+.view3d canvas{display:block;width:100%;height:100%;outline:none}.hint{font-size:.9rem;margin-top:10px}.status{margin-top:12px;color:var(--muted);font-size:.9rem}
+@media(max-width:650px){body{padding:10px}.controls{grid-template-columns:1fr}.view3d{height:58vh;min-height:330px}.head{flex-direction:column}.actions{width:100%}.actions button{flex:1}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body><main>
+<header class="head">
+ <div><h1>Garrafa de Klein e semirreta</h1><p class="sub">Explore a parametrização da garrafa de Klein e varie a direção da semirreta vermelha de comprimento fixo, com origem azul fixa.</p></div>
+ <div class="actions"><button id="openNewTab">Abrir em nova aba</button><button id="fullscreen">Tela cheia</button></div>
+</header>
+<section class="controls">
+ <div class="control"><label for="r">r — raio relativo do tubo <output id="rval">3.00</output></label><input id="r" type="range" min="0" max="3" step="0.5" value="3"></div>
+ <div class="control"><label for="a">a — multiplicador do intervalo de v <output id="aval">1.00</output></label><input id="a" type="range" min="0.1" max="2" step="0.05" value="1"></div>
+ <div class="control"><label for="theta">θ — ângulo polar <output id="thetaval">1.57</output></label><input id="theta" type="range" min="0" max="3.141592653589793" step="0.01" value="1.5707963267948966"></div>
+ <div class="control"><label for="phi">φ — ângulo azimutal <output id="phival">2.30</output></label><input id="phi" type="range" min="0" max="6.283185307179586" step="0.01" value="2.3"></div>
+</section>
+<section class="panel"><h2>Visualização 3D</h2><div class="view3d" id="view3d"></div><div class="actions" style="margin-top:10px"><button id="resetCamera">Reiniciar câmera</button><button id="resetControls">Reiniciar controles</button></div><p class="hint">Arraste para girar, use a roda do mouse para aproximar ou afastar. A origem da semirreta permanece em (0, 1.5, 0); seu comprimento é sempre 10. O modelo é desenhado sem eixos.</p></section>
+<div class="status" id="status">Carregando visualização 3D…</div>
+</main>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const $=id=>document.getElementById(id);
+const view=$('view3d');
+let scene,camera,renderer,controls,kleinGroup,rayGroup;
+const L=10;
+function kleinPoint(u,v,r){
+ const cu=Math.cos(u), su=Math.sin(u), cv=Math.cos(v), sv=Math.sin(v);
+ const x=-(4/15)*cu*(3*r*cv-30*su+90*Math.pow(cu,4)*su-60*Math.pow(cu,6)*su+5*cu*(r*cv)*su);
+ const y=-(2/15)*su*(3*r*cv-3*Math.pow(cu,2)*(r*cv)-48*Math.pow(cu,4)*(r*cv)+48*Math.pow(cu,6)*(r*cv)-60*su+5*cu*(r*cv)*su-5*Math.pow(cu,3)*(r*cv)*su-80*Math.pow(cu,5)*(r*cv)*su+80*Math.pow(cu,7)*(r*cv)*su);
+ const z=(4/15)*(3+5*cu*su)*(r*sv);
+ return new THREE.Vector3(x,y,z);
+}
+function makeKlein(r,a){
+ const nu=120,nv=Math.max(48,Math.round(100*a));
+ const positions=[],indices=[];
+ for(let i=0;i<=nu;i++){
+  const u=Math.PI*i/nu;
+  for(let j=0;j<=nv;j++){
+   const v=a*Math.PI*j/nv;
+   const p=kleinPoint(u,v,r);positions.push(p.x,p.y,p.z);
+  }
+ }
+ for(let i=0;i<nu;i++)for(let j=0;j<nv;j++){
+  const p=i*(nv+1)+j,q=p+nv+1;
+  indices.push(p,q,p+1,q,q+1,p+1);
+ }
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();
+ const mat=new THREE.MeshStandardMaterial({color:0xd5d9df,roughness:.82,metalness:.02,side:THREE.DoubleSide});
+ const mesh=new THREE.Mesh(g,mat);mesh.castShadow=true;mesh.receiveShadow=true;
+ const wire=new THREE.LineSegments(new THREE.WireframeGeometry(g),new THREE.LineBasicMaterial({color:0x596575,transparent:true,opacity:.22}));
+ const group=new THREE.Group();group.add(mesh,wire);return group;
+}
+function makeRay(theta,phi){
+ const P=new THREE.Vector3(0,1.5,0);
+ const d=new THREE.Vector3(Math.sin(theta)*Math.cos(phi),Math.sin(theta)*Math.sin(phi),Math.cos(theta)).normalize();
+ const B=P.clone().addScaledVector(d,L);
+ const group=new THREE.Group();
+ const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([P,B]),new THREE.LineBasicMaterial({color:0xff3434}));
+ group.add(line);
+ const sphere=new THREE.Mesh(new THREE.SphereGeometry(.13,24,16),new THREE.MeshStandardMaterial({color:0x246bff,roughness:.4}));
+ sphere.position.copy(P);group.add(sphere);
+ // Arrowhead oriented along direction
+ const head=new THREE.Mesh(new THREE.ConeGeometry(.17,.48,20),new THREE.MeshStandardMaterial({color:0xff3434,roughness:.45}));
+ head.position.copy(B);head.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d);group.add(head);
+ return group;
+}
+function rebuild(){
+ for(const g of [kleinGroup,rayGroup])if(g){scene.remove(g);g.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});}
+ kleinGroup=makeKlein(+$('r').value,+$('a').value);rayGroup=makeRay(+$('theta').value,+$('phi').value);
+ scene.add(kleinGroup,rayGroup);
+ for(const id of ['r','a','theta','phi'])$(id+'val').textContent=(+$(id).value).toFixed(2);
+ renderer.render(scene,camera);
+}
+function resize(){
+ const w=Math.max(1,view.clientWidth),h=Math.max(1,view.clientHeight);
+ renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.render(scene,camera);
+}
+function init(){
+ scene=new THREE.Scene();scene.background=new THREE.Color(0x080f1c);
+ camera=new THREE.PerspectiveCamera(42,1,.1,200);camera.position.set(13,11,17);
+ renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;
+ view.appendChild(renderer.domElement);
+ controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.07;controls.target.set(0,0,0);
+ scene.add(new THREE.HemisphereLight(0xffffff,0x536174,2.0));
+ const light=new THREE.DirectionalLight(0xffffff,2.2);light.position.set(8,12,10);scene.add(light);
+ const light2=new THREE.DirectionalLight(0x9ecfff,1.0);light2.position.set(-10,3,-8);scene.add(light2);
+ for(const id of ['r','a','theta','phi'])$(id).addEventListener('input',rebuild);
+ $('resetCamera').addEventListener('click',()=>{camera.position.set(13,11,17);controls.target.set(0,0,0);controls.update();});
+ $('resetControls').addEventListener('click',()=>{$('r').value=3;$('a').value=1;$('theta').value=Math.PI/2;$('phi').value=2.3;rebuild();});
+ $('openNewTab').addEventListener('click',()=>{const tab=window.open(window.location.href,'_blank');if(tab){try{tab.opener=null;}catch(e){}}else $('status').textContent='A abertura de nova aba foi bloqueada pelo navegador. Abra a página publicada diretamente no GitHub Pages.';});
+ $('fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();setTimeout(resize,120);}catch(e){$('status').textContent='Tela cheia bloqueada neste modo de incorporação. Abra a página diretamente no GitHub Pages.';}});
+ window.addEventListener('resize',resize);document.addEventListener('fullscreenchange',()=>setTimeout(resize,120));
+ controls.addEventListener('change',()=>renderer.render(scene,camera));
+ rebuild();resize();$('status').textContent='Visualização carregada.';
+}
+function animate(){requestAnimationFrame(animate);if(controls){controls.update();renderer.render(scene,camera);}}
+try{init();animate();}catch(e){$('status').textContent='Erro ao carregar a visualização: '+e.message;console.error(e);}
+</script>
+</body></html>
