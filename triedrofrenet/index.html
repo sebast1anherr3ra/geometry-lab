@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frenet e aproximações de Taylor — Geometric Lab</title>
+<style>
+:root{color-scheme:dark;--panel:#101d30;--line:#263a55;--text:#eaf2ff;--muted:#a8bad2}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#12243a,#08111f 60%);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:18px 22px 10px;max-width:1500px;margin:auto}
+h1{font-size:clamp(1.25rem,3vw,1.8rem);margin:0 0 5px}p{margin:4px 0;color:var(--muted)}
+main{max-width:1500px;margin:auto;padding:10px 18px 24px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px}
+#view{height:min(75vh,780px);min-height:420px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#07101c}
+#view canvas{display:block;width:100%;height:100%}
+.panel{background:rgba(16,29,48,.92);border:1px solid var(--line);border-radius:16px;padding:15px;height:max-content}
+.control{margin:0 0 18px}.control label{display:flex;justify-content:space-between;gap:10px;font-weight:600;margin-bottom:7px}
+input[type=range]{width:100%;accent-color:#77b9ff}
+select,button{font:inherit;color:var(--text);background:#1b304b;border:1px solid #365171;border-radius:9px;padding:9px 10px}
+select{width:100%}button{cursor:pointer}button:hover{background:#294665}
+.buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.toggle{display:flex;gap:8px;align-items:center;margin:9px 0;color:var(--muted)}.toggle input{accent-color:#77b9ff}
+.note{font-size:.87rem;color:var(--muted);margin-top:14px}
+#status{font-size:.84rem;color:#a9d5ff;margin-top:10px}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:.84rem;color:var(--muted);margin-top:12px}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+@media(max-width:850px){main{grid-template-columns:1fr}#view{height:58vh;min-height:360px}.panel{order:2}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<header>
+<h1>Triedro de Frenet e aproximações de Taylor</h1>
+<p>Compare a curva original com os polinômios de Taylor de graus 1 a 4 no parâmetro selecionado.</p>
+</header>
+<main>
+<div id="view" aria-label="Visualização tridimensional interativa"></div>
+<aside class="panel">
+ <div class="control">
+  <label for="curve"><span>Curva</span></label>
+  <select id="curve">
+   <option value="1">Curva 1 — curva esférica</option>
+   <option value="2">Curva 2 — loxodromia (rhumb line)</option>
+   <option value="3">Curva 3 — hélice</option>
+  </select>
+ </div>
+ <div class="control">
+  <label for="t0"><span>Parâmetro t₀</span><output id="t0out">0.00</output></label>
+  <input id="t0" type="range" min="-6.283185307" max="6.283185307" step="0.05" value="0">
+ </div>
+ <div class="control">
+  <label for="degree"><span>Grau máximo de Taylor</span><output id="degout">4</output></label>
+  <input id="degree" type="range" min="1" max="4" step="1" value="4">
+ </div>
+ <div class="control">
+  <label for="scale"><span>Escala dos vetores T, N, B</span><output id="scaleout">1.00</output></label>
+  <input id="scale" type="range" min="0.25" max="2" step="0.05" value="1">
+ </div>
+ <div class="control">
+  <label for="planeSize"><span>Tamanho do plano osculador</span><output id="planeout">0.50</output></label>
+  <input id="planeSize" type="range" min="0.1" max="1" step="0.05" value="0.5">
+ </div>
+ <div class="toggle"><input id="showPlane" type="checkbox" checked><label for="showPlane">Mostrar plano osculador</label></div>
+ <div class="toggle"><input id="showFrenet" type="checkbox" checked><label for="showFrenet">Mostrar triedro de Frenet</label></div>
+ <div class="toggle"><input id="showOriginal" type="checkbox" checked><label for="showOriginal">Mostrar curva original</label></div>
+ <div class="buttons">
+  <button id="reset">Resetar câmera</button><button id="autorotate" aria-pressed="false">Iniciar rotação</button>
+  <button id="newtab">Abrir em nova aba</button><button id="fullscreen">Tela cheia</button>
+ </div>
+ <div class="legend">
+  <div><span class="swatch" style="background:#4b9cff"></span>Original</div>
+  <div><span class="swatch" style="background:#ffad42"></span>Taylor 1</div>
+  <div><span class="swatch" style="background:#ff4f58"></span>Taylor 2</div>
+  <div><span class="swatch" style="background:#55df88"></span>Taylor 3</div>
+  <div><span class="swatch" style="background:#c18aff"></span>Taylor 4</div>
+  <div><span class="swatch" style="background:#f2f2f2"></span>Plano osculador</div>
+ </div>
+ <div id="status">Arraste para girar; use a roda do mouse para zoom.</div>
+ <div class="note">O triedro usa T = r′/‖r′‖, N = T′/‖T′‖ e B = T × N. As aproximações são polinômios de Taylor vetoriais calculados em torno de t₀.</div>
+</aside>
+</main>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const $=id=>document.getElementById(id);
+const root=$('view'),scene=new THREE.Scene();scene.background=new THREE.Color(0x07101c);
+const camera=new THREE.PerspectiveCamera(43,1,.01,1000);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;root.appendChild(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.07;controls.autoRotate=false;controls.autoRotateSpeed=1.2;
+function resetCamera(){camera.position.set(4.8,5.5,4.8);controls.target.set(0,0,0);controls.update()}resetCamera();
+scene.add(new THREE.HemisphereLight(0xdcecff,0x253044,2));const light=new THREE.DirectionalLight(0xffffff,2);light.position.set(5,8,7);scene.add(light);
+const grid=new THREE.GridHelper(8,16,0x4c6688,0x263a55);grid.position.z=-1.8;scene.add(grid);scene.add(new THREE.AxesHelper(1.1));
+const dynamic=new THREE.Group();scene.add(dynamic);
+const colors={original:0x4b9cff,d1:0xffad42,d2:0xff4f58,d3:0x55df88,d4:0xc18aff,T:0x55df88,N:0xff4f58,B:0x4b9cff};
+const mats={};for(const [k,c] of Object.entries(colors))mats[k]=new THREE.LineBasicMaterial({color:c});
+const point=new THREE.Mesh(new THREE.SphereGeometry(.055,18,12),new THREE.MeshStandardMaterial({color:0xff4d58,emissive:0x4c1010}));dynamic.add(point);
+function curveData(type,t){
+ if(type===1)return new THREE.Vector3(Math.cos(t)*Math.cos(2*t),Math.cos(t)*Math.sin(2*t),Math.sin(t));
+ if(type===2){const phi=Math.atan(.5*t),lam=t*10/Math.PI,r=2;return new THREE.Vector3(r*Math.cos(phi)*Math.cos(lam),r*Math.cos(phi)*Math.sin(lam),r*Math.sin(phi));}
+ return new THREE.Vector3(Math.sin(t),Math.cos(t),t);
+}
+function deriv(type,t,h=1e-4){return curveData(type,t+h).sub(curveData(type,t-h)).multiplyScalar(1/(2*h));}
+function secondDeriv(type,t,h=2e-4){return curveData(type,t+h).add(curveData(type,t-h)).addScaledVector(curveData(type,t),-2).multiplyScalar(1/(h*h));}
+function frenet(type,t){
+ const r=curveData(type,t),rp=deriv(type,t),rpp=secondDeriv(type,t);
+ const speed=rp.length();let T=rp.clone().normalize();
+ let normalPart=rpp.clone().addScaledVector(T,-rpp.dot(T));
+ if(normalPart.length()<1e-8){const nearby=deriv(type,t+1e-3);normalPart=nearby.sub(T.clone().multiplyScalar(nearby.dot(T)));}
+ let N=normalPart.length()>1e-9?normalPart.normalize():new THREE.Vector3(0,0,1);
+ let B=T.clone().cross(N).normalize();N=B.clone().cross(T).normalize();
+ return {r,T,N,B,speed};
+}
+function taylor(type,t0,degree,s){
+ const r0=curveData(type,t0),d1=deriv(type,t0),d2=secondDeriv(type,t0);
+ const h=1e-3;
+ const d3=curveData(type,t0+2*h).addScaledVector(curveData(type,t0+h),-2).addScaledVector(curveData(type,t0-h),2).sub(curveData(type,t0-2*h)).multiplyScalar(1/(2*h*h*h));
+ const d4=curveData(type,t0+2*h).addScaledVector(curveData(type,t0+h),-4).addScaledVector(r0,6).addScaledVector(curveData(type,t0-h),-4).add(curveData(type,t0-2*h)).multiplyScalar(1/(h**4));
+ const ds=[null,d1,d2,d3,d4];
+ let p=r0.clone();
+ for(let n=1;n<=degree;n++)p.addScaledVector(ds[n],Math.pow(s,n)/factorial(n));
+ return p;
+}
+function factorial(n){let x=1;for(let i=2;i<=n;i++)x*=i;return x;}
+function lineFromPoints(points,mat){return new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),mat);}
+function addArrow(origin,vec,color,label){
+ const len=vec.length();if(len<1e-8)return;
+ const dir=vec.clone().normalize(),shaftLen=len*.82,headLen=Math.min(.16,len*.28),rad=Math.min(.035,len*.08);
+ const shaft=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,shaftLen,10),new THREE.MeshStandardMaterial({color}));
+ shaft.position.copy(origin).addScaledVector(dir,shaftLen/2);shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);dynamic.add(shaft);
+ const head=new THREE.Mesh(new THREE.ConeGeometry(rad*2.5,headLen,12),new THREE.MeshStandardMaterial({color}));
+ head.position.copy(origin).addScaledVector(dir,shaftLen+headLen/2);head.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);dynamic.add(head);
+ const sprite=makeLabel(label,color);sprite.position.copy(origin).addScaledVector(vec,1.13).add(new THREE.Vector3(.04,.04,.04));dynamic.add(sprite);
+}
+function makeLabel(text,color){
+ const canvas=document.createElement('canvas');canvas.width=256;canvas.height=96;const ctx=canvas.getContext('2d');
+ ctx.font='bold 52px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#'+color.toString(16).padStart(6,'0');ctx.strokeStyle='#07101c';ctx.lineWidth=5;ctx.strokeText(text,128,48);ctx.fillText(text,128,48);
+ const tex=new THREE.CanvasTexture(canvas);const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false});const s=new THREE.Sprite(mat);s.scale.set(.48,.18,1);return s;
+}
+function buildPlane(r,T,N,size){
+ const geom=new THREE.BufferGeometry(),p=[];
+ for(const [a,b] of [[-size,-size],[size,-size],[size,size],[-size,-size],[size,size],[-size,size]]){
+  const q=r.clone().addScaledVector(T,a).addScaledVector(N,b);p.push(q.x,q.y,q.z);
+ }
+ geom.setAttribute('position',new THREE.Float32BufferAttribute(p,3));geom.computeVertexNormals();
+ return new THREE.Mesh(geom,new THREE.MeshBasicMaterial({color:0xcbd5e1,transparent:true,opacity:.24,side:THREE.DoubleSide,depthWrite:false}));
+}
+function disposeTree(obj){obj.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});}
+function clearDynamic(){while(dynamic.children.length){const o=dynamic.children[0];dynamic.remove(o);if(o!==point)disposeTree(o);}}
+function update(){
+ clearDynamic();dynamic.add(point);
+ const type=+$('curve').value,t0=+$('t0').value,degree=+$('degree').value,scale=+$('scale').value,planeSize=+$('planeSize').value;
+ $('t0out').textContent=t0.toFixed(2);$('degout').textContent=degree;$('scaleout').textContent=scale.toFixed(2);$('planeout').textContent=planeSize.toFixed(2);
+ const fr=frenet(type,t0);point.position.copy(fr.r);
+ const original=[];for(let i=0;i<=500;i++)original.push(curveData(type,-2*Math.PI+4*Math.PI*i/500));
+ const origLine=lineFromPoints(original,mats.original);origLine.visible=$('showOriginal').checked;dynamic.add(origLine);
+ const ranges={1:.5,2:.5,3:1,4:1};
+ const degColors=[null,mats.d1,mats.d2,mats.d3,mats.d4];
+ for(let n=1;n<=degree;n++){
+  const range=n<=2?.5:1,pts=[];
+  for(let i=0;i<=220;i++){const s=-range+2*range*i/220;pts.push(taylor(type,t0,n,s));}
+  dynamic.add(lineFromPoints(pts,degColors[n]));
+ }
+ if($('showFrenet').checked){
+  addArrow(fr.r,fr.T.clone().multiplyScalar(scale),colors.T,'T');
+  addArrow(fr.r,fr.N.clone().multiplyScalar(scale),colors.N,'N');
+  addArrow(fr.r,fr.B.clone().multiplyScalar(scale),colors.B,'B');
+ }
+ const plane=buildPlane(fr.r,fr.T,fr.N,planeSize);plane.visible=$('showPlane').checked;dynamic.add(plane);
+ $('status').textContent=`Curva ${type} · t₀ = ${t0.toFixed(2)} · ‖r′(t₀)‖ ≈ ${fr.speed.toFixed(3)}. Triedro e aproximações atualizados.`;
+}
+['curve','t0','degree','scale','planeSize','showPlane','showFrenet','showOriginal'].forEach(id=>$(id).addEventListener(id==='curve'?'change':'input',update));
+$('reset').addEventListener('click',resetCamera);
+$('autorotate').addEventListener('click',()=>{controls.autoRotate=!controls.autoRotate;$('autorotate').textContent=controls.autoRotate?'Parar rotação':'Iniciar rotação';$('autorotate').setAttribute('aria-pressed',String(controls.autoRotate));});
+$('newtab').addEventListener('click',()=>window.open(window.location.href,'_blank','noopener'));
+$('fullscreen').addEventListener('click',async()=>{try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen();}catch(e){$('status').textContent='Tela cheia indisponível neste contexto; tente abrir em nova aba.';}});
+function resize(){const w=Math.max(1,root.clientWidth),h=Math.max(1,root.clientHeight);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);}
+new ResizeObserver(resize).observe(root);resize();update();
+function animate(){requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);}animate();
+</script>
+</body>
+</html>
