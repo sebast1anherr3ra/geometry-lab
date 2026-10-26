@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Superfície regrada — Geometric Lab</title>
+<style>
+:root{color-scheme:dark;--bg:#08111f;--panel:#101d30;--line:#263a55;--text:#eaf2ff;--muted:#a8bad2}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#12243a,#08111f 60%);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:18px 22px 10px;max-width:1400px;margin:auto}
+h1{font-size:clamp(1.25rem,3vw,1.8rem);margin:0 0 5px}
+p{margin:4px 0;color:var(--muted)}
+main{max-width:1400px;margin:auto;padding:10px 18px 24px;display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:14px}
+#view{height:min(74vh,760px);min-height:420px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#07101c;position:relative}
+#view canvas{display:block;width:100%;height:100%}
+.panel{background:rgba(16,29,48,.92);border:1px solid var(--line);border-radius:16px;padding:15px;height:max-content}
+.control{margin:0 0 18px}.control label{display:flex;justify-content:space-between;gap:10px;font-weight:600;margin-bottom:7px}
+input[type=range]{width:100%;accent-color:#77b9ff}
+select,button{font:inherit;color:var(--text);background:#1b304b;border:1px solid #365171;border-radius:9px;padding:9px 10px}
+button{cursor:pointer}button:hover{background:#294665}
+.buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.toggle{display:flex;gap:8px;align-items:center;margin:9px 0;color:var(--muted)}
+.toggle input{accent-color:#77b9ff}
+.note{font-size:.88rem;color:var(--muted);margin-top:14px}
+#status{font-size:.84rem;color:#a9d5ff;margin-top:10px}
+@media(max-width:850px){main{grid-template-columns:1fr}#view{height:58vh;min-height:360px}.panel{order:2}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<header>
+  <h1>Superfície regrada a partir de β e δ</h1>
+  <p>Explore σ(u,v) = β(u) + vδ(u), com as curvas β e δ destacadas.</p>
+</header>
+<main>
+  <div id="view" aria-label="Visualização tridimensional interativa"></div>
+  <aside class="panel">
+    <div class="control">
+      <label for="uval"><span>Parâmetro u destacado</span><output id="uout">0.00</output></label>
+      <input id="uval" type="range" min="0" max="12.5663706144" step="0.01" value="0">
+    </div>
+    <div class="control">
+      <label for="vval"><span>Parâmetro v destacado</span><output id="vout">0.00</output></label>
+      <input id="vval" type="range" min="-0.5" max="0.5" step="0.01" value="0">
+    </div>
+    <div class="control">
+      <label for="showcurve">Curvas visíveis</label>
+      <select id="showcurve">
+        <option value="all">β, δ e superfície</option>
+        <option value="surface">Somente superfície</option>
+        <option value="beta">Superfície e β</option>
+        <option value="delta">Superfície e δ</option>
+        <option value="curves">Somente β e δ</option>
+      </select>
+    </div>
+    <div class="control">
+      <label for="opacity"><span>Opacidade da superfície</span><output id="opout">0.60</output></label>
+      <input id="opacity" type="range" min="0.1" max="1" step="0.05" value="0.6">
+    </div>
+    <div class="toggle"><input id="showgrid" type="checkbox" checked><label for="showgrid">Mostrar grade</label></div>
+    <div class="toggle"><input id="showpoint" type="checkbox" checked><label for="showpoint">Mostrar ponto σ(u,v)</label></div>
+    <div class="buttons">
+      <button id="reset">Resetar câmera</button>
+      <button id="autorotate" aria-pressed="false">Iniciar rotação</button>
+      <button id="newtab">Abrir em nova aba</button>
+      <button id="fullscreen" style="grid-column:1/-1">Tela cheia</button>
+    </div>
+    <div id="status">Arraste para girar; use a roda do mouse para zoom.</div>
+    <div class="note">β(u) = (cos u, sin u, 0)<br>δ(u) = (cos(u/2)cos u, cos(u/2)sin u, sin(u/2))<br>0 ≤ u ≤ 4π; −1/2 ≤ v ≤ 1/2.</div>
+  </aside>
+</main>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const root=document.getElementById('view');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x07101c);
+const camera=new THREE.PerspectiveCamera(43,1,0.01,1000);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+root.appendChild(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=.07;
+controls.autoRotate=false;
+controls.autoRotateSpeed=1.4;
+const initial={position:new THREE.Vector3(4.7,5.4,5.3),target:new THREE.Vector3(0,0,0)};
+function resetCamera(){camera.position.copy(initial.position);controls.target.copy(initial.target);controls.update();}
+resetCamera();
+scene.add(new THREE.HemisphereLight(0xcce4ff,0x263248,2.0));
+const light=new THREE.DirectionalLight(0xffffff,2.0);light.position.set(5,7,6);scene.add(light);
+
+const group=new THREE.Group();scene.add(group);
+const dynamic=new THREE.Group();scene.add(dynamic);
+const matSurface=new THREE.MeshStandardMaterial({color:0x80b6ff,side:THREE.DoubleSide,transparent:true,opacity:.6,roughness:.65,metalness:.02});
+const betaMat=new THREE.LineBasicMaterial({color:0xff4d55});
+const deltaMat=new THREE.LineBasicMaterial({color:0xffa43a});
+const pointMat=new THREE.MeshStandardMaterial({color:0x7dffb2,emissive:0x155b37});
+const markerMat=new THREE.MeshStandardMaterial({color:0xfff08a,emissive:0x665000});
+const pointGeo=new THREE.SphereGeometry(.055,16,12);
+const markerGeo=new THREE.SphereGeometry(.075,16,12);
+function beta(u){return new THREE.Vector3(Math.cos(u),Math.sin(u),0);}
+function delta(u){return new THREE.Vector3(Math.cos(u/2)*Math.cos(u),Math.cos(u/2)*Math.sin(u),Math.sin(u/2));}
+function sigma(u,v){return beta(u).addScaledVector(delta(u),v);}
+function curveGeometry(fn,n=900){const pts=[];for(let i=0;i<=n;i++)pts.push(fn(4*Math.PI*i/n));return new THREE.BufferGeometry().setFromPoints(pts);}
+const betaLine=new THREE.Line(curveGeometry(beta),betaMat);group.add(betaLine);
+const deltaLine=new THREE.Line(curveGeometry(delta),deltaMat);group.add(deltaLine);
+const nu=220,nv=36,positions=[],indices=[];
+for(let i=0;i<=nu;i++){
+ const u=4*Math.PI*i/nu;
+ for(let j=0;j<=nv;j++){
+  const v=-.5+j/nv;
+  const p=sigma(u,v);positions.push(p.x,p.y,p.z);
+ }
+}
+for(let i=0;i<nu;i++)for(let j=0;j<nv;j++){
+ const a=i*(nv+1)+j,b=(i+1)*(nv+1)+j,c=b+1,d=a+1;
+ indices.push(a,b,d,b,c,d);
+}
+const surfaceGeo=new THREE.BufferGeometry();
+surfaceGeo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+surfaceGeo.setIndex(indices);surfaceGeo.computeVertexNormals();
+const surface=new THREE.Mesh(surfaceGeo,matSurface);group.add(surface);
+const point=new THREE.Mesh(pointGeo,pointMat);group.add(point);
+const betaMarker=new THREE.Mesh(markerGeo,markerMat);group.add(betaMarker);
+const deltaMarker=new THREE.Mesh(markerGeo,markerMat);group.add(deltaMarker);
+const grid=new THREE.GridHelper(6,12,0x4c6688,0x263a55);grid.position.z=-1.2;scene.add(grid);
+const axes=new THREE.AxesHelper(1.6);scene.add(axes);
+
+const $=id=>document.getElementById(id);
+function update(){
+ const u=+$('uval').value,v=+$('vval').value;
+ $('uout').textContent=u.toFixed(2);$('vout').textContent=v.toFixed(2);
+ $('opout').textContent=(+$('opacity').value).toFixed(2);
+ matSurface.opacity=+$('opacity').value;
+ point.position.copy(sigma(u,v));betaMarker.position.copy(beta(u));deltaMarker.position.copy(delta(u));
+ point.visible=$('showpoint').checked;betaMarker.visible=deltaMarker.visible=true;
+ const mode=$('showcurve').value;
+ surface.visible=mode!=='curves';
+ betaLine.visible=mode==='all'||mode==='beta'||mode==='curves';
+ deltaLine.visible=mode==='all'||mode==='delta'||mode==='curves';
+ // beta/delta selection modes still show the surface, with the chosen curve.
+ grid.visible=$('showgrid').checked;
+}
+['uval','vval','opacity','showcurve','showgrid','showpoint'].forEach(id=>$(id).addEventListener('input',update));
+$('reset').addEventListener('click',resetCamera);
+$('autorotate').addEventListener('click',()=>{
+ const active=!controls.autoRotate;
+ controls.autoRotate=active;
+ $('autorotate').textContent=active?'Parar rotação':'Iniciar rotação';
+ $('autorotate').setAttribute('aria-pressed',String(active));
+ $('status').textContent=active
+   ?'Rotação automática ativada. Você ainda pode arrastar para ajustar a câmera.'
+   :'Rotação automática desativada.';
+});
+$('newtab').addEventListener('click',()=>window.open(window.location.href,'_blank','noopener'));
+$('fullscreen').addEventListener('click',async()=>{
+ try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen();}
+ catch(e){$('status').textContent='Tela cheia não permitida neste contexto; tente abrir em nova aba.';}
+});
+function resize(){
+ const w=Math.max(1,root.clientWidth),h=Math.max(1,root.clientHeight);
+ camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);
+}
+new ResizeObserver(resize).observe(root);resize();update();
+function animate(){requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);}
+animate();
+</script>
+</body>
+</html>
