@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07111f">
-<title>Geometric Lab — Toro pinçado e campos</title>
+<title> Toro pinçado e campos</title>
 <style>
 :root{color-scheme:dark;--bg:#07111f;--panel:rgba(10,24,41,.94);--line:#29435d;--text:#eaf3ff;--muted:#9bb1c9}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
