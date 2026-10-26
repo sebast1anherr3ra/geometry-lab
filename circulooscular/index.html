@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Círculo osculador — Geometric Lab</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#141c30;--line:#293653;--text:#edf2ff;--muted:#aab6d1}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:18px 22px 13px;border-bottom:1px solid var(--line)}h1{font-size:clamp(1.2rem,2.5vw,1.7rem);margin:0 0 6px}header p{margin:0;color:var(--muted);font-size:.92rem}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;padding:14px;max-width:1500px;margin:auto}
+main{display:grid;grid-template-rows:minmax(400px,60vh) 250px;gap:14px;min-width:0}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}
+.ptitle{padding:11px 14px;border-bottom:1px solid var(--line);font-size:.94rem;font-weight:650}
+#curveCanvas,#kCanvas{display:block;width:100%;height:calc(100% - 42px)}
+aside .inside{padding:16px}.control{margin-bottom:17px}.control label{display:flex;justify-content:space-between;gap:10px;font-size:.9rem;margin-bottom:8px}output{color:#c6d4ff;font-variant-numeric:tabular-nums}select,input[type=range]{width:100%;accent-color:#9b8cff}select{background:#202c47;color:var(--text);border:1px solid #3b4b70;border-radius:8px;padding:9px}
+.buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}button{border:1px solid #3b4b70;border-radius:9px;background:#202c47;color:var(--text);padding:9px;cursor:pointer;font-size:.85rem}button:hover{background:#2b3b5e}
+.checks{display:grid;gap:10px;margin:15px 0}.checks label{display:flex;gap:9px;align-items:center;font-size:.9rem}input[type=checkbox]{accent-color:#9b8cff}
+.readout{padding:12px;background:#0d1426;border:1px solid var(--line);border-radius:10px;color:var(--muted);font-size:.86rem;line-height:1.7}.readout strong{color:var(--text)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;padding:0 14px 12px;color:var(--muted);font-size:.8rem}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.note{color:var(--muted);font-size:.78rem;line-height:1.5;margin-top:14px}
+body:fullscreen{overflow:auto}body:fullscreen .layout{max-width:none;min-height:calc(100vh - 75px)}body:fullscreen main{grid-template-rows:minmax(400px,1fr) minmax(220px,30vh)}
+@media(max-width:900px){.layout{grid-template-columns:1fr}main{grid-template-rows:minmax(360px,55vh) 230px}aside{order:-1}}
+@media(max-width:520px){.layout{padding:8px;gap:8px}main{grid-template-rows:380px 230px;gap:8px}header{padding:15px}}
+</style>
+</head>
+<body>
+<header><h1>Círculo osculador e curvatura</h1><p>Explore a catenária, a parábola e hipocicloides; acompanhe o ponto móvel, a curvatura e o círculo osculador.</p></header>
+<div class="layout">
+<main>
+<section class="panel"><div class="ptitle">Curva e círculo osculador</div><canvas id="curveCanvas"></canvas><div class="legend"><span><i class="dot" style="background:#60a5fa"></i>Curva</span><span><i class="dot" style="background:#f87171"></i>Círculo osculador</span><span><i class="dot" style="background:#34d399"></i>Ponto de contato</span><span><i class="dot" style="background:#fbbf24"></i>Centro de curvatura</span></div></section>
+<section class="panel"><div class="ptitle">Função curvatura κ(t)</div><canvas id="kCanvas"></canvas></section>
+</main>
+<aside class="panel"><div class="ptitle">Controles</div><div class="inside">
+<div class="control"><label for="curveSelect">Curva</label><select id="curveSelect"><option value="cat">Catenária</option><option value="par">Parábola</option><option value="hyp3">Hipocicloide de 3 cúspides</option><option value="hyp4">Hipocicloide de 4 cúspides</option><option value="hyp5">Hipocicloide de 5 cúspides</option></select></div>
+<div class="control"><label for="tSlider">Parâmetro t <output id="tOut">0.00</output></label><input id="tSlider" type="range" min="-3.2" max="3.2" step="0.01" value="0"></div>
+<div class="control"><label for="speedSlider">Velocidade da animação <output id="speedOut">1.00×</output></label><input id="speedSlider" type="range" min="0.2" max="3" step="0.1" value="1"></div>
+<div class="checks">
+<label><input id="circleToggle" type="checkbox" checked> Círculo osculador</label>
+<label><input id="centerToggle" type="checkbox" checked> Centro de curvatura</label>
+<label><input id="tangentToggle" type="checkbox" checked> Vetor tangente</label>
+<label><input id="normalToggle" type="checkbox" checked> Vetor normal</label>
+<label><input id="gridToggle" type="checkbox" checked> Grade cartesiana</label>
+<label><input id="autoToggle" type="checkbox"> Animar automaticamente</label>
+</div>
+<div class="buttons"><button id="playBtn">▶ Animar</button><button id="resetBtn">Reiniciar t</button><button id="fitBtn">Ajustar enquadramento</button><button id="fullBtn">Tela cheia</button></div>
+<div class="readout"><div><strong>Ponto P(t):</strong> <span id="pOut"></span></div><div><strong>Curvatura:</strong> <span id="kapOut"></span></div><div><strong>Raio osculador:</strong> <span id="rhoOut"></span></div><div><strong>Centro C(t):</strong> <span id="cOut"></span></div></div>
+<p class="note">O círculo osculador é calculado por C = P + N/κ e ρ = 1/κ. Nas cúspides, onde a curvatura pode deixar de ser regular, o círculo é ocultado quando os valores numéricos se tornam singulares.</p>
+</div></aside>
+</div>
+<script>
+(() => {
+const $=id=>document.getElementById(id);
+const curveCanvas=$('curveCanvas'), kCanvas=$('kCanvas');
+const ctx=curveCanvas.getContext('2d'), kctx=kCanvas.getContext('2d');
+const TAU=2*Math.PI, TMIN=-3.2,TMAX=3.2;
+let animating=false,last=0, view=null;
+function curve(t,type){
+ if(type==='cat')return {x:t,y:Math.cosh(t)};
+ if(type==='par')return {x:t,y:t*t};
+ const n=type==='hyp3'?3:type==='hyp4'?4:5, r=1, R=n-r;
+ return {x:R*Math.cos(t)+r*Math.cos(R*t/r),y:R*Math.sin(t)-r*Math.sin(R*t/r)};
+}
+function deriv(t,type){
+ if(type==='cat')return {x:1,y:Math.sinh(t)};
+ if(type==='par')return {x:1,y:2*t};
+ const n=type==='hyp3'?3:type==='hyp4'?4:5, R=n-1;
+ return {x:-R*Math.sin(t)-R*Math.sin(R*t),y:R*Math.cos(t)-R*Math.cos(R*t)};
+}
+function second(t,type){
+ if(type==='cat')return {x:0,y:Math.cosh(t)};
+ if(type==='par')return {x:0,y:2};
+ const n=type==='hyp3'?3:type==='hyp4'?4:5,R=n-1;
+ return {x:-R*Math.cos(t)-R*R*Math.cos(R*t),y:-R*Math.sin(t)+R*R*Math.sin(R*t)};
+}
+function frame(t,type){
+ const p=curve(t,type),v=deriv(t,type),a=second(t,type),speed=Math.hypot(v.x,v.y);
+ const cross=v.x*a.y-v.y*a.x, k=Math.abs(cross)/Math.pow(speed,3);
+ if(speed<1e-8||!Number.isFinite(k))return {p,k:NaN,rho:NaN};
+ const T={x:v.x/speed,y:v.y/speed}, sign=cross>=0?1:-1;
+ const N={x:-T.y*sign,y:T.x*sign};
+ const rho=k>1e-7?1/k:Infinity;
+ const c={x:p.x+rho*N.x,y:p.y+rho*N.y};
+ return {p,T,N,k,rho,c};
+}
+function type(){return $('curveSelect').value}
+function sizeCanvas(c){
+ const rect=c.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);
+ c.width=Math.max(1,Math.round(rect.width*dpr));c.height=Math.max(1,Math.round(rect.height*dpr));
+ const context=c.getContext('2d');context.setTransform(dpr,0,0,dpr,0,0);
+ return {w:rect.width,h:rect.height,ctx:context};
+}
+function bounds(){
+ const typ=type();let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
+ for(let i=0;i<=800;i++){const t=TMIN+(TMAX-TMIN)*i/800,p=curve(t,typ);if(!Number.isFinite(p.x+p.y))continue;xmin=Math.min(xmin,p.x);xmax=Math.max(xmax,p.x);ymin=Math.min(ymin,p.y);ymax=Math.max(ymax,p.y);}
+ const padX=(xmax-xmin)*.12||1,padY=(ymax-ymin)*.12||1;
+ xmin-=padX;xmax+=padX;ymin-=padY;ymax+=padY;
+ const rect=curveCanvas.getBoundingClientRect(),w=rect.width,h=rect.height,aspect=w/Math.max(h,1);
+ let dx=xmax-xmin,dy=ymax-ymin;
+ if(dx/dy>aspect){const mid=(ymin+ymax)/2;dy=dx/aspect;ymin=mid-dy/2;ymax=mid+dy/2;}else{const mid=(xmin+xmax)/2;dx=dy*aspect;xmin=mid-dx/2;xmax=mid+dx/2;}
+ return {xmin,xmax,ymin,ymax};
+}
+function mapFactory(b,w,h){
+ const pad=30, sx=(w-2*pad)/(b.xmax-b.xmin),sy=(h-2*pad)/(b.ymax-b.ymin),s=Math.min(sx,sy);
+ const ww=(b.xmax-b.xmin)*s,hh=(b.ymax-b.ymin)*s,ox=(w-ww)/2-b.xmin*s,oy=(h-hh)/2+b.ymax*s;
+ return p=>({x:ox+p.x*s,y:oy-p.y*s,s});
+}
+function drawGrid(context,w,h,map,b){
+ if(!$('gridToggle').checked)return;
+ context.strokeStyle='#263451';context.lineWidth=1;context.fillStyle='#9baaca';context.font='11px system-ui';
+ const step=niceStep((b.xmax-b.xmin)/8);
+ for(let x=Math.ceil(b.xmin/step)*step;x<=b.xmax;x+=step){const q=map({x,y:0});context.beginPath();context.moveTo(q.x,0);context.lineTo(q.x,h);context.stroke();if(q.x>20&&q.x<w-10)context.fillText(Number(x.toPrecision(3)).toString(),q.x+3, h-8);}
+ const sy=niceStep((b.ymax-b.ymin)/7);
+ for(let y=Math.ceil(b.ymin/sy)*sy;y<=b.ymax;y+=sy){const q=map({x:0,y});context.beginPath();context.moveTo(0,q.y);context.lineTo(w,q.y);context.stroke();if(q.y>12&&q.y<h-10)context.fillText(Number(y.toPrecision(3)).toString(),5,q.y-3);}
+}
+function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(Math.max(x,1e-9)))),q=x/p;return (q<1.5?1:q<3.5?2:q<7.5?5:10)*p}
+function drawArrow(context,map,from,to,color,label){
+ const a=map(from),b=map(to),dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy);if(L<1)return;
+ context.strokeStyle=color;context.fillStyle=color;context.lineWidth=2.2;context.beginPath();context.moveTo(a.x,a.y);context.lineTo(b.x,b.y);context.stroke();
+ const ang=Math.atan2(dy,dx),head=8;context.beginPath();context.moveTo(b.x,b.y);context.lineTo(b.x-head*Math.cos(ang-.45),b.y-head*Math.sin(ang-.45));context.lineTo(b.x-head*Math.cos(ang+.45),b.y-head*Math.sin(ang+.45));context.closePath();context.fill();
+ context.font='bold 13px system-ui';context.fillText(label,b.x+5,b.y-5);
+}
+function drawCurve(){
+ const {w,h,ctx:c}=sizeCanvas(curveCanvas);c.fillStyle='#10182b';c.fillRect(0,0,w,h);
+ const b=bounds(),map=mapFactory(b,w,h);view={b,map,w,h};drawGrid(c,w,h,map,b);
+ c.strokeStyle='#60a5fa';c.lineWidth=2.5;c.beginPath();
+ for(let i=0;i<=1000;i++){const t=TMIN+(TMAX-TMIN)*i/1000,p=map(curve(t,type()));if(i===0)c.moveTo(p.x,p.y);else c.lineTo(p.x,p.y);}c.stroke();
+ const t=Number($('tSlider').value),f=frame(t,type()),P=map(f.p);
+ if($('circleToggle').checked&&Number.isFinite(f.rho)&&f.rho<1e5){
+   const C=map(f.c),rad=f.rho*P.s;
+   if(Number.isFinite(rad)&&rad<1e5){c.strokeStyle='#f87171';c.lineWidth=2;c.beginPath();c.arc(C.x,C.y,rad,0,TAU);c.stroke();}
+ }
+ if($('centerToggle').checked&&Number.isFinite(f.rho)&&f.rho<1e5){const C=map(f.c);c.fillStyle='#fbbf24';c.beginPath();c.arc(C.x,C.y,4.5,0,TAU);c.fill();}
+ if(f.T&&$('tangentToggle').checked)drawArrow(c,map,f.p,{x:f.p.x+f.T.x*.65,y:f.p.y+f.T.y*.65},'#34d399','T');
+ if(f.N&&$('normalToggle').checked)drawArrow(c,map,f.p,{x:f.p.x+f.N.x*.65,y:f.p.y+f.N.y*.65},'#fbbf24','N');
+ c.fillStyle='#34d399';c.beginPath();c.arc(P.x,P.y,5.5,0,TAU);c.fill();c.strokeStyle='#07101e';c.lineWidth=1.5;c.stroke();
+ $('tOut').textContent=t.toFixed(2);$('pOut').textContent=`(${f.p.x.toFixed(3)}, ${f.p.y.toFixed(3)})`;
+ $('kapOut').textContent=Number.isFinite(f.k)?f.k.toFixed(5):'indefinida';
+ $('rhoOut').textContent=Number.isFinite(f.rho)?f.rho.toFixed(5):'∞';
+ $('cOut').textContent=f.c&&Number.isFinite(f.c.x+f.c.y)?`(${f.c.x.toFixed(3)}, ${f.c.y.toFixed(3)})`:'indefinido';
+}
+function drawK(){
+ const {w,h,ctx:c}=sizeCanvas(kCanvas);c.fillStyle='#10182b';c.fillRect(0,0,w,h);
+ const L=48,R=14,TP=14,BP=30,pw=w-L-R,ph=h-TP-BP;
+ const xmin=TMIN,xmax=TMAX;let ymax=0;const values=[];
+ for(let i=0;i<=700;i++){const t=xmin+(xmax-xmin)*i/700,k=frame(t,type()).k;values.push({t,k});if(Number.isFinite(k))ymax=Math.max(ymax,k);}
+ ymax=Math.max(ymax*1.12,.1);const X=t=>L+(t-xmin)/(xmax-xmin)*pw,Y=k=>TP+ph-k/ymax*ph;
+ c.strokeStyle='#293653';c.fillStyle='#aab6d1';c.font='11px system-ui';c.lineWidth=1;
+ for(let i=0;i<=4;i++){const y=ymax*i/4;c.beginPath();c.moveTo(L,Y(y));c.lineTo(w-R,Y(y));c.stroke();c.textAlign='right';c.fillText(y.toFixed(3),L-7,Y(y)+4);}
+ for(let i=0;i<=4;i++){const t=xmin+(xmax-xmin)*i/4;c.beginPath();c.moveTo(X(t),TP);c.lineTo(X(t),h-BP);c.stroke();c.textAlign='center';c.fillText(t.toFixed(1),X(t),h-10);}
+ c.strokeStyle='#f87171';c.lineWidth=2.3;c.beginPath();let started=false;
+ for(const v of values){if(!Number.isFinite(v.k)){started=false;continue;}const x=X(v.t),y=Y(v.k);if(!started){c.moveTo(x,y);started=true;}else c.lineTo(x,y);}c.stroke();
+ const t=Number($('tSlider').value),k=frame(t,type()).k;
+ if(Number.isFinite(k)){c.strokeStyle='#fbbf24';c.setLineDash([4,4]);c.beginPath();c.moveTo(X(t),TP);c.lineTo(X(t),h-BP);c.stroke();c.setLineDash([]);c.fillStyle='#fbbf24';c.beginPath();c.arc(X(t),Y(k),4,0,TAU);c.fill();}
+ c.fillStyle='#edf2ff';c.textAlign='left';c.fillText('κ(t)',L,12);
+}
+function render(){drawCurve();drawK();}
+function reset(){ $('tSlider').value='0';render();}
+$('curveSelect').addEventListener('change',render);$('tSlider').addEventListener('input',render);
+['circleToggle','centerToggle','tangentToggle','normalToggle','gridToggle'].forEach(id=>$(id).addEventListener('change',render));
+$('speedSlider').addEventListener('input',()=> $('speedOut').textContent=Number($('speedSlider').value).toFixed(1)+'×');
+$('playBtn').addEventListener('click',()=>{animating=!animating;$('playBtn').textContent=animating?'❚❚ Pausar':'▶ Animar';});
+$('autoToggle').addEventListener('change',e=>{animating=e.target.checked;$('playBtn').textContent=animating?'❚❚ Pausar':'▶ Animar';});
+$('resetBtn').addEventListener('click',reset);
+$('fitBtn').addEventListener('click',render);
+$('fullBtn').addEventListener('click',async()=>{try{if(!document.fullscreenElement){await document.documentElement.requestFullscreen();$('fullBtn').textContent='Sair da tela cheia';}else await document.exitFullscreen();}catch(e){console.warn('Tela cheia não permitida neste contexto',e);}});
+document.addEventListener('fullscreenchange',()=>{$('fullBtn').textContent=document.fullscreenElement?'Sair da tela cheia':'Tela cheia';setTimeout(render,100);});
+window.addEventListener('resize',render);
+function tick(now){requestAnimationFrame(tick);if(last===0)last=now;const dt=Math.min((now-last)/1000,.05);last=now;if(animating){let t=Number($('tSlider').value)+dt*.65*Number($('speedSlider').value);if(t>TMAX)t=TMIN;$('tSlider').value=t.toFixed(3);render();}}
+try {
+  render();
+  requestAnimationFrame(tick);
+} catch (err) {
+  console.error(err);
+  document.body.insertAdjacentHTML('beforeend',
+    '<div style="position:fixed;bottom:12px;left:12px;right:12px;background:#4b1d2a;color:#fff;padding:12px;border-radius:8px;z-index:9999;font:13px system-ui">Erro ao iniciar a visualização: '+String(err && err.message ? err.message : err).replace(/[<>&]/g, '')+'</div>');
+}
+})();
+</script>
+</body>
+</html>
